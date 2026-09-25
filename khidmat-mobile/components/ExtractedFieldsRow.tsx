@@ -1,20 +1,12 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '@/lib/theme/colors';
 
 type ExtractedFieldsRowProps = {
   service: string | null;
   location: string | null;
   time: string | null;
 };
-
-// Placeholder shown for a field the agent couldn't extract.
-const EMPTY = {
-  bg: 'bg-gray-200',
-  text: 'text-gray-500',
-  iconColor: colors.gray500,
-} as const;
 
 export function ExtractedFieldsRow({
   service,
@@ -23,42 +15,63 @@ export function ExtractedFieldsRow({
 }: ExtractedFieldsRowProps) {
   const fields = [
     {
-      icon: 'construct' as const,
+      icon: 'construct-sharp' as const,
       value: service,
-      bg: 'bg-primary-100',
-      text: 'text-primary-800',
-      iconColor: colors.primary800,
+      bgColor: '#FFF7ED',
+      borderColor: '#FDBA74',
+      textColor: '#9A3412',
+      iconColor: '#EA580C',
+      fallback: 'General Service',
     },
     {
-      icon: 'location' as const,
+      icon: 'location-sharp' as const,
       value: location,
-      bg: 'bg-blue-100',
-      text: 'text-blue-800',
-      iconColor: colors.blue800,
+      bgColor: '#EFF6FF',
+      borderColor: '#BFDBFE',
+      textColor: '#1E40AF',
+      iconColor: '#2563EB',
+      fallback: 'Location Not Set',
     },
     {
       icon: 'time' as const,
       value: time,
-      bg: 'bg-purple-100',
-      text: 'text-purple-800',
-      iconColor: colors.purple800,
+      bgColor: '#FAF5FF',
+      borderColor: '#E9D5FF',
+      textColor: '#6B21A8',
+      iconColor: '#7C3AED',
+      fallback: 'As Soon As Possible',
     },
   ];
 
   return (
-    <View className="mt-2 flex-row flex-wrap gap-2">
-      {fields.map((field) => {
-        const style = field.value ? field : EMPTY;
+    <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+      {fields.map((field, idx) => {
+        const textValue = field.value || field.fallback;
         return (
           <View
-            key={field.icon}
-            className={`flex-row items-center rounded-full px-3 py-1.5 ${style.bg}`}
+            key={idx}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: field.bgColor,
+              borderColor: field.borderColor,
+              borderWidth: 1,
+              borderRadius: 12,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+            }}
           >
-            <Ionicons name={field.icon} size={13} color={style.iconColor} />
+            <Ionicons name={field.icon} size={12} color={field.iconColor} />
             <Text
-              className={`ml-1.5 text-xs font-semibold capitalize ${style.text}`}
+              style={{
+                marginLeft: 5,
+                fontSize: 12,
+                fontWeight: '700',
+                color: field.textColor,
+                textTransform: 'capitalize',
+              }}
             >
-              {field.value ?? 'Unknown'}
+              {textValue}
             </Text>
           </View>
         );

@@ -96,8 +96,8 @@ export default function ChatScreen() {
     [scrollToBottom],
   );
 
-  const handleSend = useCallback(async () => {
-    const text = inputText.trim();
+  const handleSend = useCallback(async (customText?: string) => {
+    const text = (typeof customText === 'string' ? customText : inputText).trim();
     if (!text || isProcessing) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -240,13 +240,25 @@ export default function ChatScreen() {
 
         case 'searching':
           return (
-            <View>
-              <ChatBubble side="agent">
-                <Text className="text-[15px] text-gray-900">
-                  Looking for {categoryRoleLabel(event.category)} near{' '}
-                  {event.near}
+            <View style={{ marginBottom: 10 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#F9FAFB',
+                  borderColor: '#E5E7EB',
+                  borderWidth: 1,
+                  borderRadius: 20,
+                  alignSelf: 'flex-start',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                }}
+              >
+                <Ionicons name="search" size={13} color="#6B7280" style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 13, color: '#4B5563', fontWeight: '500' }}>
+                  Scanning {categoryRoleLabel(event.category)} in {event.near}...
                 </Text>
-              </ChatBubble>
+              </View>
               {showLoading && (
                 <RealtimeSearchRadar
                   category={categoryRoleLabel(event.category)}
@@ -259,13 +271,25 @@ export default function ChatScreen() {
 
         case 'ranking':
           return (
-            <View>
-              <ChatBubble side="agent">
-                <Text className="text-[15px] text-gray-900">
-                  Found {event.candidateCount} nearby. Ranking by distance,
-                  rating, and availability
+            <View style={{ marginBottom: 10 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#F0FDF4',
+                  borderColor: '#BBF7D0',
+                  borderWidth: 1,
+                  borderRadius: 20,
+                  alignSelf: 'flex-start',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                }}
+              >
+                <Ionicons name="checkmark-circle" size={13} color="#16A34A" style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 13, color: '#166534', fontWeight: '600' }}>
+                  Found {event.candidateCount} providers • Ranked by distance & rating
                 </Text>
-              </ChatBubble>
+              </View>
               {showLoading && (
                 <RealtimeSearchRadar
                   category="Provider"
@@ -279,10 +303,27 @@ export default function ChatScreen() {
 
         case 'recommendation':
           return (
-            <ChatBubble side="agent">
-              <Text className="mb-1 text-[15px] text-gray-900">
-                Here&apos;s who I&apos;d recommend:
-              </Text>
+            <View style={{ marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, marginLeft: 2 }}>
+                <View
+                  style={{
+                    height: 22,
+                    width: 22,
+                    borderRadius: 11,
+                    backgroundColor: '#FFF7ED',
+                    borderWidth: 1,
+                    borderColor: '#FED7AA',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 6,
+                  }}
+                >
+                  <Ionicons name="sparkles" size={12} color={colors.primary} />
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#1F2937' }}>
+                  Top AI Match for Your Request:
+                </Text>
+              </View>
               <ProviderCard
                 provider={event.provider}
                 distanceKm={event.distanceKm}
@@ -291,7 +332,7 @@ export default function ChatScreen() {
                 dayLabel={event.dayLabel}
                 onBook={() => handleBook(event)}
               />
-            </ChatBubble>
+            </View>
           );
 
         case 'awaiting_user':

@@ -3,7 +3,9 @@ import { runAgent as runMockAgent, confirmBooking as confirmMockBooking } from '
 import type { AgentContext } from './mockAgent';
 import type { Provider } from '../mock/providers';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+import { getApiBaseUrl } from '../util/apiConfig';
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Runs the live LangGraph agent on khidmat-server via SSE.

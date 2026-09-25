@@ -38,6 +38,12 @@
             "backgroundColor": "#7C2D12"
           }
         }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Khidmat to record voice notes for booking home services in Urdu or English."
+        }
       ]
     ],
     "experiments": {

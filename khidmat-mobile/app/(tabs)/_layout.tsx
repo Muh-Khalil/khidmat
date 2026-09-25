@@ -49,7 +49,7 @@ export default function TabsLayout() {
         name="bookings"
         options={{
           title: 'Bookings',
-          href: isProvider ? null : '/bookings',
+          href: isProvider ? null : undefined,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar" size={size} color={color} />
           ),
@@ -60,7 +60,7 @@ export default function TabsLayout() {
         name="dues"
         options={{
           title: 'Dues Ledger',
-          href: isProvider ? '/dues' : null,
+          href: isProvider ? undefined : null,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="wallet-outline" size={size} color={color} />
           ),

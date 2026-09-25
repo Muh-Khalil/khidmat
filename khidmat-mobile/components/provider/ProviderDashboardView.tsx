@@ -106,7 +106,7 @@ export function ProviderDashboardView({ user }: ProviderDashboardViewProps) {
         isOnline={isOnline}
         onToggleOnline={setIsOnline}
         onSwitchRole={() => router.push('/auth')}
-        onViewDues={() => router.push('/dues')}
+        onViewDues={() => router.push('/(tabs)/dues')}
         pendingJobsCount={pendingJobsCount}
         totalDuesAmount={pendingDuesTotal}
       />
