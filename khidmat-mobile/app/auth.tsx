@@ -9,13 +9,16 @@ import {
   Platform,
   Modal,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { useAuthStore, UserRole } from '@/lib/stores/useAuthStore';
+import { useAuthStore, UserRole, Coordinates } from '@/lib/stores/useAuthStore';
+import { useSettingsStore } from '@/lib/stores/useSettingsStore';
+import { getCurrentUserLocation } from '@/lib/services/locationService';
 import { toast } from '@/lib/stores/useToastStore';
 import { colors } from '@/lib/theme/colors';
 
@@ -28,6 +31,7 @@ interface AreaOption {
 }
 
 const POPULAR_AREAS: AreaOption[] = [
+  // Islamabad Sectors
   { id: 'isb_g11', name: 'Sector G-11', city: 'Islamabad', popular: true },
   { id: 'isb_g13', name: 'Sector G-13', city: 'Islamabad', popular: true },
   { id: 'isb_f7', name: 'Sector F-7', city: 'Islamabad', popular: true },
@@ -45,11 +49,23 @@ const POPULAR_AREAS: AreaOption[] = [
   { id: 'isb_d12', name: 'Sector D-12', city: 'Islamabad' },
   { id: 'isb_pwd', name: 'PWD Housing Society', city: 'Islamabad' },
   { id: 'isb_bahria', name: 'Bahria Town (Phases 1-8)', city: 'Islamabad / Rawalpindi', popular: true },
+  // Rawalpindi
   { id: 'rwp_saddar', name: 'Saddar Cantt', city: 'Rawalpindi', popular: true },
   { id: 'rwp_commercial', name: 'Commercial Market (Satellite Town)', city: 'Rawalpindi', popular: true },
   { id: 'rwp_westridge', name: 'Westridge', city: 'Rawalpindi' },
   { id: 'rwp_peshawar_rd', name: 'Peshawar Road', city: 'Rawalpindi' },
   { id: 'rwp_chaklala', name: 'Chaklala Scheme 3', city: 'Rawalpindi' },
+  // Khyber Pakhtunkhwa (Mardan, Peshawar, Swabi, etc.)
+  { id: 'kpk_mardan', name: 'Mardan City', city: 'Mardan, Khyber Pakhtunkhwa', popular: true },
+  { id: 'kpk_peshawar_city', name: 'Peshawar City', city: 'Peshawar, Khyber Pakhtunkhwa', popular: true },
+  { id: 'kpk_hayatabad', name: 'Hayatabad', city: 'Peshawar, Khyber Pakhtunkhwa', popular: true },
+  { id: 'kpk_swabi', name: 'Swabi City', city: 'Swabi, Khyber Pakhtunkhwa' },
+  { id: 'kpk_nowshehra', name: 'Nowshera Cantt', city: 'Nowshera, Khyber Pakhtunkhwa' },
+  { id: 'kpk_abbottabad', name: 'Abbottabad City', city: 'Abbottabad, Khyber Pakhtunkhwa' },
+  // Other Major Cities
+  { id: 'lhr_gulberg', name: 'Gulberg', city: 'Lahore, Punjab', popular: true },
+  { id: 'lhr_dha', name: 'DHA', city: 'Lahore, Punjab' },
+  { id: 'khi_clifton', name: 'Clifton', city: 'Karachi, Sindh' },
 ];
 
 // Provider Setup Categories for progressive onboarding
@@ -79,6 +95,10 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<string>('Sector G-11, Islamabad');
+  const [coordinates, setCoordinates] = useState<Coordinates | null>({
+    latitude: 33.7215,
+    longitude: 73.0538,
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -135,24 +155,53 @@ export default function AuthScreen() {
     );
   }, [locationSearch]);
 
-  // Primary Location Action: Use Current Location (Simulated device GPS resolution without exposing lat/long)
+  // Primary Location Action: Real device GPS resolution via expo-location
   const handleUseCurrentLocation = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setIsDetectingLocation(true);
       setFieldErrors((prev) => ({ ...prev, location: undefined }));
 
-      // Simulate device location permission & quick reverse geocoding to human-readable area
-      setTimeout(() => {
-        setIsDetectingLocation(false);
-        const detectedArea = 'Sector G-11, Islamabad';
-        setSelectedLocation(detectedArea);
-        toast.success('Location Detected', detectedArea);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }, 700);
-    } catch {
+      const result = await getCurrentUserLocation();
       setIsDetectingLocation(false);
-      setSelectedLocation('Sector G-11, Islamabad');
+
+      if (result.success && result.coordinates) {
+        setCoordinates(result.coordinates);
+        const loc = result.formattedAddress || 'Detected Location';
+        setSelectedLocation(loc);
+
+        // Store coordinates in settings store for PostGIS spatial matching
+        useSettingsStore.getState().setUserCoordinates(result.coordinates);
+        useSettingsStore.getState().setDefaultLocation(loc);
+
+        toast.success('Location Detected', `📍 ${loc}`);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+        if (result.error === 'SERVICES_DISABLED') {
+          // Do not attempt to force enable GPS; inform user clearly
+          Alert.alert(
+            'Location Services Disabled',
+            result.message || 'Please turn on Location in your device settings to detect your current area.',
+            [{ text: 'OK' }],
+          );
+          toast.warning('GPS Turned Off', 'Please enable Location in settings.');
+        } else if (result.error === 'PERMISSION_DENIED') {
+          Alert.alert(
+            'Location Permission Needed',
+            result.message || 'Please allow location permission in settings to automatically find nearby providers.',
+            [{ text: 'OK' }],
+          );
+          toast.error('Permission Required', 'Location access was denied.');
+        } else {
+          toast.error('Location Error', result.message || 'Could not retrieve coordinates.');
+        }
+      }
+    } catch (err: any) {
+      setIsDetectingLocation(false);
+      console.error('[auth] Location detection exception:', err);
+      toast.error('Location Failed', 'Could not detect GPS location. Please select your area manually.');
     }
   };
 
@@ -215,7 +264,11 @@ export default function AuthScreen() {
           email: email.trim() || 'user@khidmat.pk',
           role,
           sector: selectedLocation.split(',')[0].trim() || 'G-11',
+          coordinates: coordinates || undefined,
         });
+        if (coordinates) {
+          useSettingsStore.getState().setUserCoordinates(coordinates);
+        }
         toast.success(
           'Welcome Back!',
           `Signed in as ${role === 'provider' ? 'Service Provider' : 'Customer'}.`,
@@ -264,7 +317,13 @@ export default function AuthScreen() {
         email: email.trim(),
         role,
         sector: selectedLocation.split(',')[0].trim() || 'G-11',
+        coordinates: coordinates || undefined,
       });
+
+      if (coordinates) {
+        useSettingsStore.getState().setUserCoordinates(coordinates);
+      }
+      useSettingsStore.getState().setDefaultLocation(selectedLocation);
 
       if (role === 'provider') {
         toast.success(

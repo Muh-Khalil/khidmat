@@ -67,6 +67,7 @@ export default function ChatScreen() {
 
   const insets = useSafeAreaInsets();
   const defaultLocation = useSettingsStore((s) => s.defaultLocation);
+  const userCoordinates = useSettingsStore((s) => s.userCoordinates);
   const addBooking = useBookingsStore((s) => s.addBooking);
 
   const scrollToBottom = useCallback(() => {
@@ -117,6 +118,7 @@ export default function ChatScreen() {
     try {
       const gen = runAgent(text, {
         defaultLocation,
+        coordinates: userCoordinates,
         conversationHistory: agentEventsRef.current,
       });
 
@@ -128,7 +130,7 @@ export default function ChatScreen() {
     } finally {
       setIsProcessing(false);
     }
-  }, [inputText, isProcessing, defaultLocation, addAgentMessage, scrollToBottom]);
+  }, [inputText, isProcessing, defaultLocation, userCoordinates, addAgentMessage, scrollToBottom]);
 
   const handleBook = useCallback(
     async (rec: RecommendationEvent) => {

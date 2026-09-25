@@ -28,6 +28,7 @@ export async function* runLiveAgent(
       body: JSON.stringify({
         message: input,
         defaultLocation: ctx.defaultLocation,
+        coordinates: ctx.coordinates,
         sessionId,
       }),
     });

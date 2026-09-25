@@ -7,9 +7,12 @@ import { CATEGORY_NOUN } from '../categories';
 import { makeId } from '../util/id';
 import type { AgentEvent, ExtractedIntent } from './types';
 
+import type { Coordinates } from '../stores/useAuthStore';
+
 /** Per-request context the chat screen passes into the mock agent. */
 export type AgentContext = {
   defaultLocation: string;
+  coordinates?: Coordinates | null;
   conversationHistory: AgentEvent[];
 };
 
@@ -297,7 +300,9 @@ export async function* runAgent(
   await delay(STAGE_DELAY_MS.searching);
 
   // 4. Filter + rank
-  const userCoords = sectorCoords(location);
+  const userCoords = context.coordinates
+    ? { lat: context.coordinates.latitude, lng: context.coordinates.longitude }
+    : sectorCoords(location);
   const candidates = providers
     .filter((p) => p.category === service)
     .map((p) => ({

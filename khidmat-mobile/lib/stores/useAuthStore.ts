@@ -5,6 +5,11 @@ import { STORAGE_KEYS } from './storageKeys';
 
 export type UserRole = 'customer' | 'provider';
 
+export interface Coordinates {
+  latitude: number;
+  longitude: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -12,6 +17,7 @@ export interface User {
   email: string;
   role: UserRole;
   sector?: string;
+  coordinates?: Coordinates;
   avatarUrl?: string;
 }
 
@@ -20,7 +26,14 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   login: (userData: Partial<User>) => void;
-  signup: (userData: { name: string; phone: string; email?: string; role: UserRole; sector?: string }) => void;
+  signup: (userData: {
+    name: string;
+    phone: string;
+    email?: string;
+    role: UserRole;
+    sector?: string;
+    coordinates?: Coordinates;
+  }) => void;
   logout: () => void;
   updateProfile: (userData: Partial<User>) => void;
 }
@@ -32,6 +45,10 @@ const DEFAULT_DEMO_USER: User = {
   email: 'ahmed.hassan@example.com',
   role: 'customer',
   sector: 'F-7',
+  coordinates: {
+    latitude: 33.7215,
+    longitude: 73.0538,
+  },
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -49,6 +66,7 @@ export const useAuthStore = create<AuthState>()(
           email: userData.email || 'user@khidmat.pk',
           role: userData.role || 'customer',
           sector: userData.sector || 'F-7',
+          coordinates: userData.coordinates,
         };
         set({
           user: fullUser,
@@ -65,6 +83,7 @@ export const useAuthStore = create<AuthState>()(
           email: userData.email || '',
           role: userData.role,
           sector: userData.sector || 'F-7',
+          coordinates: userData.coordinates,
         };
         set({
           user: newUser,

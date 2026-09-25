@@ -7,10 +7,12 @@ import {
   Pressable,
   Alert,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 import { useSettingsStore } from '@/lib/stores/useSettingsStore';
 import { useBookingsStore } from '@/lib/stores/useBookingsStore';
@@ -19,11 +21,14 @@ import { Button } from '@/components/Button';
 import { SECTORS as SECTOR_OPTIONS, DEFAULT_SECTOR } from '@/lib/mock/providers';
 import { toast } from '@/lib/stores/useToastStore';
 import { colors } from '@/lib/theme/colors';
+import { getCurrentUserLocation } from '@/lib/services/locationService';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const defaultLocation = useSettingsStore((s) => s.defaultLocation);
   const setDefaultLocation = useSettingsStore((s) => s.setDefaultLocation);
+  const userCoordinates = useSettingsStore((s) => s.userCoordinates);
+  const setUserCoordinates = useSettingsStore((s) => s.setUserCoordinates);
   const clearBookings = useBookingsStore((s) => s.clear);
 
   const user = useAuthStore((s) => s.user);
@@ -32,6 +37,7 @@ export default function SettingsScreen() {
 
   const [locationInput, setLocationInput] = useState(defaultLocation);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   const filteredSectors = useMemo(() => {
     if (!locationInput) return SECTOR_OPTIONS;
@@ -66,6 +72,43 @@ export default function SettingsScreen() {
         setLocationInput(defaultLocation);
       }
     }, 200);
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setIsDetectingLocation(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const result = await getCurrentUserLocation();
+    setIsDetectingLocation(false);
+
+    if (!result.success) {
+      if (result.error === 'SERVICES_DISABLED') {
+        Alert.alert(
+          'Location Services Disabled',
+          'GPS / Location Services are turned off on your device. Please turn on Location in your device settings to auto-detect your area.',
+          [{ text: 'OK' }]
+        );
+      } else if (result.error === 'PERMISSION_DENIED') {
+        Alert.alert(
+          'Location Permission Required',
+          'Khidmat needs location permission to find technicians near you. Please enable location permissions in settings.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Location Error', result.message || 'Could not retrieve location.');
+      }
+      return;
+    }
+
+    if (result.coordinates) {
+      setUserCoordinates(result.coordinates);
+    }
+
+    const detectedName = result.city || result.formattedAddress || 'Islamabad';
+    setDefaultLocation(detectedName);
+    setLocationInput(detectedName);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    toast.success('Location Updated', `Default location set to ${detectedName}`);
   };
 
   const handleClearBookings = () => {
@@ -113,7 +156,7 @@ export default function SettingsScreen() {
         .slice(0, 2)
     : 'U';
 
-  const POPULAR_SECTORS = ['G-11', 'G-13', 'F-10', 'F-7', 'E-11', 'I-8', 'H-13'];
+  const POPULAR_SECTORS = ['G-11', 'G-13', 'F-10', 'F-7', 'E-11', 'I-8', 'Mardan', 'Peshawar', 'Swabi'];
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
@@ -229,6 +272,34 @@ export default function SettingsScreen() {
           <Text className="text-xs text-gray-500 mb-3">
             Aap ka ilaaqa — used automatically when you request a service without specifying location.
           </Text>
+
+          {/* Current Location GPS Button */}
+          <TouchableOpacity
+            onPress={handleUseCurrentLocation}
+            disabled={isDetectingLocation}
+            className="mb-4 flex-row items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-2.5 active:bg-primary/10"
+          >
+            <View className="flex-row items-center gap-2.5 flex-1">
+              <View className="h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                {isDetectingLocation ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="navigate" size={17} color={colors.primary} />
+                )}
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs font-bold text-gray-900">
+                  {isDetectingLocation ? 'GPS se ilaaqa dhoond rahe hain...' : 'Use Current Location (GPS)'}
+                </Text>
+                <Text className="text-[11px] text-gray-500">
+                  {userCoordinates
+                    ? `GPS Saved: ${userCoordinates.latitude.toFixed(3)}, ${userCoordinates.longitude.toFixed(3)}`
+                    : 'Auto-detect city and Islamabad/KPK sector'}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.gray400} />
+          </TouchableOpacity>
 
           {/* Quick Sector Tap Chips (Low-literacy friendly) */}
           <Text className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">

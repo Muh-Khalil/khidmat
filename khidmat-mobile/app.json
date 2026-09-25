@@ -44,6 +44,12 @@
         {
           "microphonePermission": "Allow Khidmat to record voice notes for booking home services in Urdu or English."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Khidmat to use your location to connect you with nearby verified service providers in your city."
+        }
       ]
     ],
     "experiments": {
