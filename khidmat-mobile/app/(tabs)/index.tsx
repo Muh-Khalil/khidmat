@@ -20,11 +20,13 @@ import { ProviderCard } from '@/components/ProviderCard';
 import { InputBar } from '@/components/InputBar';
 import { ExamplePromptChip } from '@/components/ExamplePromptChip';
 import { FadeIn, TypingIndicator } from '@/components/ChatLoaders';
+import { RealtimeSearchRadar } from '@/components/RealtimeSearchRadar';
 import { confirmBooking, DEFAULT_REMINDER_LABEL } from '@/lib/agent/mockAgent';
 import { runLiveAgent as runAgent } from '@/lib/agent/liveAgent';
 import { useSettingsStore } from '@/lib/stores/useSettingsStore';
 import { useBookingsStore } from '@/lib/stores/useBookingsStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
+import { useToastStore, toast } from '@/lib/stores/useToastStore';
 import { ProviderDashboardView } from '@/components/provider/ProviderDashboardView';
 import { categoryRoleLabel } from '@/lib/categories';
 import { makeId } from '@/lib/util/id';
@@ -164,6 +166,10 @@ export default function ChatScreen() {
             agentThread: [...agentEventsRef.current],
             createdAt: Date.now(),
           });
+          toast.success(
+            'Booking Confirmed!',
+            `Appointment scheduled with ${rec.provider.name}.`,
+          );
         }
       } catch (e) {
         console.error('Booking error:', e);
@@ -195,6 +201,7 @@ export default function ChatScreen() {
             setAgentEvents([]);
             agentEventsRef.current = [];
             setInputText('');
+            toast.info('Chat Cleared', 'Ready for a new service request.');
           },
         },
       ],
@@ -240,7 +247,13 @@ export default function ChatScreen() {
                   {event.near}
                 </Text>
               </ChatBubble>
-              {showLoading && <TypingIndicator />}
+              {showLoading && (
+                <RealtimeSearchRadar
+                  category={categoryRoleLabel(event.category)}
+                  sector={event.near}
+                  phase="searching"
+                />
+              )}
             </View>
           );
 
@@ -253,7 +266,14 @@ export default function ChatScreen() {
                   rating, and availability
                 </Text>
               </ChatBubble>
-              {showLoading && <TypingIndicator />}
+              {showLoading && (
+                <RealtimeSearchRadar
+                  category="Provider"
+                  sector={defaultLocation || 'Islamabad'}
+                  candidateCount={event.candidateCount}
+                  phase="ranking"
+                />
+              )}
             </View>
           );
 
@@ -438,12 +458,22 @@ export default function ChatScreen() {
                 );
               })}
 
+              {/* Immediate live scanner when waiting for first agent response */}
+              {isProcessing && messages[messages.length - 1]?.role === 'user' && (
+                <FadeIn>
+                  <RealtimeSearchRadar
+                    sector={defaultLocation || 'Islamabad'}
+                    phase="analyzing"
+                  />
+                </FadeIn>
+              )}
+
               {/* Footer link after booking confirmed */}
               {agentEvents.some((e) => e.type === 'confirmed') && (
                 <FadeIn>
                   <Text
                     className="mt-2 text-center text-xs text-primary"
-                    onPress={() => router.push('/(tabs)/bookings')}
+                    onPress={() => router.push('/bookings')}
                   >
                     View this booking in your Bookings tab →
                   </Text>

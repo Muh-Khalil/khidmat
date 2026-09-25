@@ -12,8 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { User } from '@/lib/stores/useAuthStore';
 import { ProviderHeader } from './ProviderHeader';
 import { JobCard, ProviderJob } from './JobCard';
-import { DuesLedgerCard } from './DuesLedgerCard';
 import { useDuesStore } from '@/lib/stores/useDuesStore';
+import { toast } from '@/lib/stores/useToastStore';
 import { colors } from '@/lib/theme/colors';
 
 interface ProviderDashboardViewProps {
@@ -66,20 +66,21 @@ export function ProviderDashboardView({ user }: ProviderDashboardViewProps) {
     setJobs((prev) =>
       prev.map((j) => (j.id === id ? { ...j, status: 'accepted' } : j)),
     );
-    Alert.alert('Job Accepted!', 'The client has been notified. You can now call them.');
+    toast.success('Job Accepted!', 'Client notified. You can now call them.');
   };
 
   const handleDeclineJob = (id: string) => {
     setJobs((prev) =>
       prev.map((j) => (j.id === id ? { ...j, status: 'declined' } : j)),
     );
+    toast.info('Job Declined', 'Job has been removed from your active queue.');
   };
 
   const handleCompleteJob = (id: string) => {
     setJobs((prev) =>
       prev.map((j) => (j.id === id ? { ...j, status: 'completed' } : j)),
     );
-    Alert.alert('Service Completed', 'Great job! Payment status updated.');
+    toast.success('Service Completed!', 'Great job! Payment status updated.');
   };
 
   const handleRefresh = () => {
@@ -105,12 +106,10 @@ export function ProviderDashboardView({ user }: ProviderDashboardViewProps) {
         isOnline={isOnline}
         onToggleOnline={setIsOnline}
         onSwitchRole={() => router.push('/auth')}
+        onViewDues={() => router.push('/dues')}
         pendingJobsCount={pendingJobsCount}
         totalDuesAmount={pendingDuesTotal}
       />
-
-      {/* Customer Dues & Financial Ledger Section */}
-      <DuesLedgerCard />
 
       {/* Jobs Dispatch Queue Header */}
       <View className="mb-3 flex-row items-center justify-between">

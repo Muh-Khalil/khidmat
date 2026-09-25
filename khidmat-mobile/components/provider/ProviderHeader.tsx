@@ -11,6 +11,7 @@ interface ProviderHeaderProps {
   onSwitchRole: () => void;
   pendingJobsCount: number;
   totalDuesAmount: number;
+  onViewDues?: () => void;
 }
 
 export function ProviderHeader({
@@ -20,6 +21,7 @@ export function ProviderHeader({
   onSwitchRole,
   pendingJobsCount,
   totalDuesAmount,
+  onViewDues,
 }: ProviderHeaderProps) {
   const initials = user.name
     .split(' ')
@@ -31,31 +33,33 @@ export function ProviderHeader({
   return (
     <View className="mb-4 rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
       {/* Top row: Profile & Availability Switch */}
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-3">
+      <View className="flex-row items-center justify-between gap-2">
+        <View className="flex-1 flex-row items-center gap-3">
           <View className="h-12 w-12 items-center justify-center rounded-full bg-primary/10 border border-primary/30">
             <Text className="text-base font-bold text-primary">{initials}</Text>
           </View>
-          <View>
-            <View className="flex-row items-center gap-2">
-              <Text className="text-base font-bold text-gray-900">{user.name}</Text>
+          <View className="flex-1">
+            <View className="flex-row items-center gap-1.5 flex-wrap">
+              <Text className="text-base font-bold text-gray-900" numberOfLines={1}>
+                {user.name}
+              </Text>
               <View className="rounded-full bg-amber-100 px-2 py-0.5">
                 <Text className="text-[10px] font-bold text-amber-800">
                   Karigar Pro
                 </Text>
               </View>
             </View>
-            <Text className="text-xs text-gray-500">
-              Sector: {user.sector || 'F-7'} • 4.9 ★ (48 reviews)
+            <Text className="text-xs text-gray-500 mt-0.5">
+              Sector: {user.sector || 'G-11'} • 4.9 ★ (48 reviews)
             </Text>
           </View>
         </View>
 
         <TouchableOpacity
           onPress={onSwitchRole}
-          className="rounded-lg bg-gray-100 px-2.5 py-1.5 active:bg-gray-200"
+          className="rounded-xl bg-gray-100 px-3 py-2 active:bg-gray-200 border border-gray-200/80"
         >
-          <Text className="text-xs font-semibold text-gray-600">Switch Role</Text>
+          <Text className="text-xs font-bold text-gray-700">Switch</Text>
         </TouchableOpacity>
       </View>
 
@@ -88,12 +92,21 @@ export function ProviderHeader({
           </Text>
         </View>
 
-        <View className="flex-1 rounded-xl bg-amber-50/70 p-3 border border-amber-100">
-          <Text className="text-[11px] font-semibold text-gray-500">Customer Dues</Text>
+        <TouchableOpacity
+          onPress={onViewDues}
+          activeOpacity={onViewDues ? 0.7 : 1}
+          className="flex-1 rounded-xl bg-amber-50/70 p-3 border border-amber-100 justify-between"
+        >
+          <View className="flex-row items-center justify-between">
+            <Text className="text-[11px] font-semibold text-gray-500">Customer Dues</Text>
+            {onViewDues && (
+              <Ionicons name="chevron-forward" size={13} color={colors.gray400} />
+            )}
+          </View>
           <Text className="mt-0.5 text-lg font-bold text-amber-900">
             Rs {totalDuesAmount.toLocaleString()}
           </Text>
-        </View>
+        </TouchableOpacity>
       </View>
     </View>
   );

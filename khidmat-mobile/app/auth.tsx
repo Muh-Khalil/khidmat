@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuthStore, UserRole } from '@/lib/stores/useAuthStore';
-import { Button } from '@/components/Button';
+import { toast } from '@/lib/stores/useToastStore';
 import { colors } from '@/lib/theme/colors';
 import { SECTORS } from '@/lib/mock/providers';
 
@@ -37,10 +37,20 @@ export default function AuthScreen() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleClose = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/(tabs)');
+    try {
+      if (router.canDismiss && router.canDismiss()) {
+        router.dismiss();
+      } else if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch {
+      try {
+        router.replace('/(tabs)');
+      } catch (err) {
+        console.warn('Navigation close error:', err);
+      }
     }
   };
 
@@ -80,9 +90,11 @@ export default function AuthScreen() {
           role,
           sector,
         });
-        Alert.alert('Welcome Back!', `Signed in successfully as ${role === 'provider' ? 'Service Provider' : 'Customer'}.`, [
-          { text: 'OK', onPress: handleClose },
-        ]);
+        toast.success(
+          'Welcome Back!',
+          `Signed in as ${role === 'provider' ? 'Service Provider' : 'Customer'}.`,
+        );
+        handleClose();
       } else {
         signup({
           name: name.trim(),
@@ -91,9 +103,8 @@ export default function AuthScreen() {
           role,
           sector,
         });
-        Alert.alert('Account Created!', 'Your Khidmat account has been registered.', [
-          { text: 'Get Started', onPress: handleClose },
-        ]);
+        toast.success('Account Created!', 'Your Khidmat account has been registered.');
+        handleClose();
       }
     }, 600);
   };
@@ -111,6 +122,7 @@ export default function AuthScreen() {
           role: 'customer',
           sector: 'F-7',
         });
+        toast.success('Demo Active', 'Signed in as Customer (Ahmed Hassan).');
       } else {
         login({
           id: 'usr_demo_provider',
@@ -120,6 +132,7 @@ export default function AuthScreen() {
           role: 'provider',
           sector: 'G-11',
         });
+        toast.success('Demo Active', 'Signed in as Provider (Tariq Mehmood).');
       }
       handleClose();
     }, 400);
@@ -169,13 +182,12 @@ export default function AuthScreen() {
                 setMode('login');
                 setErrorMsg('');
               }}
-              className={`flex-1 items-center py-2.5 rounded-lg ${
-                mode === 'login' ? 'bg-white shadow-sm' : ''
-              }`}
+              style={mode === 'login' ? { backgroundColor: '#FFFFFF', elevation: 1 } : undefined}
+              className="flex-1 items-center py-2.5 rounded-lg"
             >
               <Text
                 className={`text-sm font-semibold ${
-                  mode === 'login' ? 'text-primary' : 'text-gray-500'
+                  mode === 'login' ? 'text-primary font-bold' : 'text-gray-500'
                 }`}
               >
                 Sign In
@@ -183,17 +195,17 @@ export default function AuthScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              activeOpacity={0.8}
               onPress={() => {
                 setMode('signup');
                 setErrorMsg('');
               }}
-              className={`flex-1 items-center py-2.5 rounded-lg ${
-                mode === 'signup' ? 'bg-white shadow-sm' : ''
-              }`}
+              style={mode === 'signup' ? { backgroundColor: '#FFFFFF', elevation: 1 } : undefined}
+              className="flex-1 items-center py-2.5 rounded-lg"
             >
               <Text
                 className={`text-sm font-semibold ${
-                  mode === 'signup' ? 'text-primary' : 'text-gray-500'
+                  mode === 'signup' ? 'text-primary font-bold' : 'text-gray-500'
                 }`}
               >
                 Create Account
@@ -207,10 +219,11 @@ export default function AuthScreen() {
           </Text>
           <View className="mb-5 flex-row gap-3">
             <TouchableOpacity
+              activeOpacity={0.8}
               onPress={() => setRole('customer')}
               className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl border p-3 ${
                 role === 'customer'
-                  ? 'border-primary bg-orange-50/50'
+                  ? 'border-primary bg-orange-50'
                   : 'border-gray-200 bg-white'
               }`}
             >
@@ -221,7 +234,7 @@ export default function AuthScreen() {
               />
               <Text
                 className={`text-sm font-semibold ${
-                  role === 'customer' ? 'text-primary' : 'text-gray-600'
+                  role === 'customer' ? 'text-primary font-bold' : 'text-gray-600'
                 }`}
               >
                 Customer
@@ -229,10 +242,11 @@ export default function AuthScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              activeOpacity={0.8}
               onPress={() => setRole('provider')}
               className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl border p-3 ${
                 role === 'provider'
-                  ? 'border-primary bg-orange-50/50'
+                  ? 'border-primary bg-orange-50'
                   : 'border-gray-200 bg-white'
               }`}
             >
@@ -243,7 +257,7 @@ export default function AuthScreen() {
               />
               <Text
                 className={`text-sm font-semibold ${
-                  role === 'provider' ? 'text-primary' : 'text-gray-600'
+                  role === 'provider' ? 'text-primary font-bold' : 'text-gray-600'
                 }`}
               >
                 Provider 
@@ -324,16 +338,17 @@ export default function AuthScreen() {
                 {SECTORS.map((s) => (
                   <TouchableOpacity
                     key={s}
+                    activeOpacity={0.8}
                     onPress={() => setSector(s)}
                     className={`mr-2 rounded-lg px-3 py-1.5 border ${
                       sector === s
-                        ? 'border-primary bg-primary text-white'
+                        ? 'border-primary bg-primary'
                         : 'border-gray-200 bg-gray-50'
                     }`}
                   >
                     <Text
                       className={`text-xs font-semibold ${
-                        sector === s ? 'text-primary font-bold' : 'text-gray-600'
+                        sector === s ? 'text-white font-bold' : 'text-gray-700'
                       }`}
                     >
                       {s}
@@ -368,9 +383,22 @@ export default function AuthScreen() {
           </View>
 
           {/* Submit Button */}
-          <Button disabled={isLoading} onPress={handleSubmit}>
-            {mode === 'login' ? 'Sign In to Khidmat' : 'Create Account'}
-          </Button>
+          <TouchableOpacity
+            disabled={isLoading}
+            onPress={handleSubmit}
+            activeOpacity={0.85}
+            className={`items-center justify-center rounded-xl bg-primary py-3.5 px-6 shadow-sm active:bg-primaryActive ${
+              isLoading ? 'opacity-60' : ''
+            }`}
+          >
+            <Text className="text-white font-bold text-sm">
+              {isLoading
+                ? 'Processing...'
+                : mode === 'login'
+                ? 'Sign In to Khidmat'
+                : 'Create Account'}
+            </Text>
+          </TouchableOpacity>
 
           {/* Divider */}
           <View className="my-6 flex-row items-center">

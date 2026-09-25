@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/lib/theme/colors';
 import { useDuesStore, CustomerDue } from '@/lib/stores/useDuesStore';
+import { toast } from '@/lib/stores/useToastStore';
 
 export function DuesLedgerCard() {
   const dues = useDuesStore((s) => s.dues);
@@ -27,12 +28,12 @@ export function DuesLedgerCard() {
 
   const handleAddDueSubmit = () => {
     if (!custName.trim() || !amountStr.trim()) {
-      Alert.alert('Validation Error', 'Please enter customer name and amount.');
+      toast.warning('Validation Error', 'Please enter customer name and amount.');
       return;
     }
     const amt = parseFloat(amountStr);
     if (isNaN(amt) || amt <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
+      toast.warning('Invalid Amount', 'Please enter a valid amount.');
       return;
     }
 
@@ -52,7 +53,7 @@ export function DuesLedgerCard() {
     setAmountStr('');
     setDesc('');
     setModalVisible(false);
-    Alert.alert('Due Recorded', 'Customer dues record added to ledger.');
+    toast.success('Due Recorded', 'Customer dues record added to ledger.');
   };
 
   return (
@@ -133,7 +134,10 @@ export function DuesLedgerCard() {
               </Text>
               {item.status === 'pending' ? (
                 <TouchableOpacity
-                  onPress={() => markAsPaid(item.id)}
+                  onPress={() => {
+                    markAsPaid(item.id);
+                    toast.success('Payment Received', `Rs ${item.amount.toLocaleString()} received from ${item.customerName}`);
+                  }}
                   className="rounded-lg bg-green-50 px-2 py-1 border border-green-200 active:bg-green-100 flex-row items-center gap-1.5"
                 >
                   <Text className="text-[10px] font-bold text-green-700">

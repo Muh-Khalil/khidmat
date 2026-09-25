@@ -21,6 +21,7 @@ import { providers } from '@/lib/mock/providers';
 import type { AgentEvent } from '@/lib/agent/types';
 import { categoryEmoji, categoryServiceLabel } from '@/lib/categories';
 import { formatLocationLabel } from '@/lib/util/location';
+import { toast } from '@/lib/stores/useToastStore';
 import { colors } from '@/lib/theme/colors';
 
 // ── Status Timeline ─────────────────────────────────────────────
@@ -75,13 +76,14 @@ export default function BookingDetailScreen() {
           onPress: () => {
             if (id) {
               cancel(id);
+              toast.info('Booking Cancelled', 'The booking has been cancelled.');
               router.back();
             }
           },
         },
       ],
     );
-  }, [id, cancel]);
+  }, [id, cancel, router]);
 
   const handleMarkCompleted = useCallback(() => {
     if (!id) return;
@@ -89,7 +91,10 @@ export default function BookingDetailScreen() {
       { text: 'Not yet', style: 'cancel' },
       {
         text: 'Mark Completed',
-        onPress: () => updateStatus(id, 'completed'),
+        onPress: () => {
+          updateStatus(id, 'completed');
+          toast.success('Service Completed!', 'Booking has been marked complete.');
+        },
       },
     ]);
   }, [id, updateStatus]);
