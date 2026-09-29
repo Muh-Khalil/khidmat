@@ -21,19 +21,17 @@ import { InputBar } from '@/components/InputBar';
 import { ExamplePromptChip } from '@/components/ExamplePromptChip';
 import { FadeIn, TypingIndicator } from '@/components/ChatLoaders';
 import { RealtimeSearchRadar } from '@/components/RealtimeSearchRadar';
-import { confirmBooking, DEFAULT_REMINDER_LABEL } from '@/lib/agent/mockAgent';
 import { runLiveAgent as runAgent } from '@/lib/agent/liveAgent';
 import { useSettingsStore } from '@/lib/stores/useSettingsStore';
-import { useBookingsStore } from '@/lib/stores/useBookingsStore';
+import { useRequestsStore } from '@/lib/stores/useRequestsStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
-import { useToastStore, toast } from '@/lib/stores/useToastStore';
+import { toast } from '@/lib/stores/useToastStore';
 import { ProviderDashboardView } from '@/components/provider/ProviderDashboardView';
 import { categoryRoleLabel } from '@/lib/categories';
 import { makeId } from '@/lib/util/id';
 import { formatLocationLabel } from '@/lib/util/location';
 import { colors } from '@/lib/theme/colors';
 import { formatSchedule } from '@/lib/util/schedule';
-import { findEventOfType } from '@/lib/agent/findEvent';
 import type { AgentEvent } from '@/lib/agent/types';
 
 type RecommendationEvent = Extract<AgentEvent, { type: 'recommendation' }>;
@@ -68,7 +66,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const defaultLocation = useSettingsStore((s) => s.defaultLocation);
   const userCoordinates = useSettingsStore((s) => s.userCoordinates);
-  const addBooking = useBookingsStore((s) => s.addBooking);
+  const createRequest = useRequestsStore((s) => s.createRequest);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -136,50 +134,29 @@ export default function ChatScreen() {
     async (rec: RecommendationEvent) => {
       if (isProcessing) return;
       setIsProcessing(true);
-
-      // Collect booking-flow events locally so we don't depend on stale state
-      const bookingFlowEvents: AgentEvent[] = [];
-
       try {
-        const gen = confirmBooking(rec.provider, rec.suggestedSlot, rec.dayLabel);
-
-        for await (const event of gen) {
-          addAgentMessage(event);
-          bookingFlowEvents.push(event);
-        }
-
-        const confirmedEvent = findEventOfType(bookingFlowEvents, 'confirmed');
-        const reminderEvent = findEventOfType(
-          bookingFlowEvents,
-          'reminder_scheduled',
-        );
-
-        if (confirmedEvent) {
-          addBooking({
-            id: confirmedEvent.bookingId,
-            providerId: rec.provider.id,
-            providerName: rec.provider.name,
-            category: rec.provider.category,
-            sector: rec.provider.sector,
-            scheduledFor: formatSchedule(rec.dayLabel, rec.suggestedSlot),
-            scheduledTimestamp: rec.scheduledTimestamp,
-            status: 'confirmed',
-            reminderAt: reminderEvent?.at ?? DEFAULT_REMINDER_LABEL,
-            agentThread: [...agentEventsRef.current],
-            createdAt: Date.now(),
-          });
-          toast.success(
-            'Booking Confirmed!',
-            `Appointment scheduled with ${rec.provider.name}.`,
-          );
-        }
+        const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
+        const requestId = await createRequest({
+          category: rec.provider.category,
+          issueDescription: lastUserMessage?.role === 'user' ? lastUserMessage.text : `${rec.provider.category} service required`,
+          urgency: 'medium', sector: rec.provider.sector,
+          location: userCoordinates
+            ? { lat: userCoordinates.latitude, lng: userCoordinates.longitude }
+            : rec.provider.coords,
+          requestedStartAt: rec.scheduledTimestamp,
+          requestedTimeLabel: formatSchedule(rec.dayLabel, rec.suggestedSlot),
+        });
+        if (requestId) {
+          toast.success('Request bhej di', 'Qareebi providers se jawab aayega.');
+          router.push(`/requests/${requestId}` as any);
+        } else toast.error('Request nahi gayi', 'Internet check karke dobara koshish karein.');
       } catch (e) {
         console.error('Booking error:', e);
       } finally {
         setIsProcessing(false);
       }
     },
-    [isProcessing, addAgentMessage, addBooking],
+    [isProcessing, createRequest, messages, router, userCoordinates],
   );
 
   const handleChipPress = useCallback(
@@ -362,7 +339,7 @@ export default function ChatScreen() {
           return (
             <ChatBubble side="agent" tone="success">
               <Text className="text-[15px] font-semibold text-green-900">
-                ✅ Confirmed! Your booking is set.
+                ✅ Request bhej di. Provider ke jawab ka intezaar karein.
               </Text>
             </ChatBubble>
           );
@@ -485,6 +462,7 @@ export default function ChatScreen() {
                   />
                 ))}
               </View>
+              <Pressable onPress={() => router.push('/providers/external' as any)} className="mt-5 flex-row items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 active:bg-gray-50"><Ionicons name="search" size={18} color={colors.primary} /><Text className="ml-2 text-sm font-bold text-gray-700">Khidmat se bahar providers dhoondein</Text></Pressable>
             </View>
           ) : (
             <>
@@ -511,14 +489,14 @@ export default function ChatScreen() {
                 </FadeIn>
               )}
 
-              {/* Footer link after booking confirmed */}
+              {/* Footer link after request dispatch */}
               {agentEvents.some((e) => e.type === 'confirmed') && (
                 <FadeIn>
                   <Text
                     className="mt-2 text-center text-xs text-primary"
                     onPress={() => router.push('/bookings')}
                   >
-                    View this booking in your Bookings tab →
+                    Apni request dekhein • Bookings →
                   </Text>
                 </FadeIn>
               )}

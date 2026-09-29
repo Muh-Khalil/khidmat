@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,15 +12,17 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { useAuthStore, UserRole, Coordinates } from '@/lib/stores/useAuthStore';
 import { useSettingsStore } from '@/lib/stores/useSettingsStore';
 import { getCurrentUserLocation } from '@/lib/services/locationService';
+import { authenticatedFetch } from '@/lib/services/authenticatedFetch';
 import { toast } from '@/lib/stores/useToastStore';
 import { colors } from '@/lib/theme/colors';
+import { getApiBaseUrl } from '@/lib/util/apiConfig';
 
 // Human-readable city/area list for manual fallback (Islamabad & Rawalpindi)
 interface AreaOption {
@@ -80,9 +82,9 @@ const PROVIDER_TRADES = [
 ];
 
 export default function AuthScreen() {
-  const router = useRouter();
   const login = useAuthStore((s) => s.login);
   const signup = useAuthStore((s) => s.signup);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   // Progressive Onboarding Wizard: 'form' -> 'verify_phone' -> 'provider_setup'
   const [authStep, setAuthStep] = useState<'form' | 'verify_phone' | 'provider_setup'>('form');
@@ -117,30 +119,28 @@ export default function AuthScreen() {
   }>({});
 
   // Phone Verification (Step 2) state
-  const [otpCode, setOtpCode] = useState('1234');
-  const [resendCountdown, setResendCountdown] = useState(30);
+  const [otpCode, setOtpCode] = useState('');
+  const [phoneVerificationToken, setPhoneVerificationToken] = useState('');
+  const otpInputRef = useRef<TextInput>(null);
+  const [isOtpFocused, setIsOtpFocused] = useState(false);
 
   // Provider Setup (Step 3) state
   const [selectedTrade, setSelectedTrade] = useState('electrician');
   const [experienceLevel, setExperienceLevel] = useState('3-5 Years');
   const [workRadius, setWorkRadius] = useState('Within My Sector & Nearby (5 km)');
+  const [hourlyRate, setHourlyRate] = useState<number>(1200);
+  const [availableSlots, setAvailableSlots] = useState<string[]>(['morning', 'evening']);
 
   // Safely dismiss or go back
   const handleClose = () => {
     try {
-      if (router.canDismiss && router.canDismiss()) {
-        router.dismiss();
-      } else if (router.canGoBack()) {
+      if (typeof router.canGoBack === 'function' && router.canGoBack()) {
         router.back();
       } else {
         router.replace('/(tabs)');
       }
     } catch {
-      try {
-        router.replace('/(tabs)');
-      } catch (err) {
-        console.warn('Navigation close error:', err);
-      }
+      router.replace('/(tabs)');
     }
   };
 
@@ -238,7 +238,7 @@ export default function AuthScreen() {
   };
 
   // Initial Form Submit
-  const handleFormSubmit = () => {
+  const handleFormSubmit = async () => {
     if (!validateForm()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
@@ -247,60 +247,101 @@ export default function AuthScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      const cleanPhone = phone.replace(/[^0-9]/g, '');
-      const formattedPhone = cleanPhone.startsWith('92')
-        ? `+${cleanPhone}`
-        : cleanPhone.startsWith('0')
-        ? `+92 ${cleanPhone.slice(1)}`
-        : `+92 ${cleanPhone}`;
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const formattedPhone = cleanPhone.startsWith('92')
+      ? `+${cleanPhone}`
+      : cleanPhone.startsWith('0')
+      ? `+92 ${cleanPhone.slice(1)}`
+      : `+92 ${cleanPhone}`;
 
-      if (mode === 'login') {
-        // Direct Login
-        login({
+    if (mode === 'login') {
+      try {
+        const loggedUser = await login({
           name: name.trim() || (role === 'provider' ? 'Tariq Electrician' : 'Customer Account'),
           phone: formattedPhone,
           email: email.trim() || 'user@khidmat.pk',
+          password,
           role,
           sector: selectedLocation.split(',')[0].trim() || 'G-11',
           coordinates: coordinates || undefined,
         });
+
+        setIsLoading(false);
         if (coordinates) {
           useSettingsStore.getState().setUserCoordinates(coordinates);
         }
         toast.success(
           'Welcome Back!',
-          `Signed in as ${role === 'provider' ? 'Service Provider' : 'Customer'}.`,
+          `Signed in as ${loggedUser?.role === 'provider' ? 'Service Provider' : 'Customer'}.`,
         );
-        handleClose();
-      } else {
-        // Progressive Signup: Advance to Step 2 (Phone Verification)
-        setAuthStep('verify_phone');
+        router.replace('/(tabs)');
+      } catch (err: any) {
+        setIsLoading(false);
+        toast.error('Sign In Failed', err.message || 'Please check your phone and PIN.');
       }
-    }, 450);
+    } else {
+      try {
+        const baseUrl = getApiBaseUrl();
+        const response = await fetch(`${baseUrl}/api/auth/phone/request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: formattedPhone }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Code send nahi hua');
+        setAuthStep('verify_phone');
+        toast.success('Code bhej diya', 'SMS mein aya code yahan likhein.');
+      } catch (err: any) {
+        toast.error('Code nahi bheja', err.message || 'Dobara koshish karein.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   // Step 2: Verify Phone Submit
-  const handleVerifyPhone = () => {
+  const handleVerifyPhone = async () => {
     if (!otpCode || otpCode.length < 4) {
       setFieldErrors({ otp: 'Please enter the 4-digit code (Code darj karein)' });
       return;
     }
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setIsLoading(true);
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const formattedPhone = cleanPhone.startsWith('92')
+      ? `+${cleanPhone}`
+      : cleanPhone.startsWith('0')
+      ? `+92${cleanPhone.slice(1)}`
+      : `+92${cleanPhone}`;
 
-    if (role === 'provider') {
-      // Advance to progressive Step 3 (Provider Trade Setup)
-      setAuthStep('provider_setup');
-    } else {
-      // Customer registration completes immediately!
-      finishRegistration();
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/auth/phone/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formattedPhone, code: otpCode }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.data?.phoneVerificationToken) {
+        throw new Error(result.message || 'Code ghalat hai');
+      }
+      setPhoneVerificationToken(result.data.phoneVerificationToken);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if (role === 'provider') {
+        setAuthStep('provider_setup');
+      } else {
+        await finishRegistration(undefined, result.data.phoneVerificationToken);
+      }
+    } catch (err: any) {
+      setFieldErrors({ otp: err.message || 'Code ghalat ya expire ho gaya' });
+      toast.error('Code verify nahi hua', err.message || 'Dobara code check karein.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Finish Registration & save to Zustand store
-  const finishRegistration = (tradeInfo?: string) => {
+  const finishRegistration = async (tradeInfo?: string, verifiedToken = phoneVerificationToken) => {
     setIsLoading(true);
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     const formattedPhone = cleanPhone.startsWith('92')
@@ -309,23 +350,52 @@ export default function AuthScreen() {
       ? `+92 ${cleanPhone.slice(1)}`
       : `+92 ${cleanPhone}`;
 
-    setTimeout(() => {
-      setIsLoading(false);
-      signup({
+    try {
+      const newUser = await signup({
         name: name.trim() || (role === 'provider' ? 'Tariq Electrician' : 'Ahmed Hassan'),
         phone: formattedPhone,
         email: email.trim(),
+        password,
         role,
         sector: selectedLocation.split(',')[0].trim() || 'G-11',
         coordinates: coordinates || undefined,
+        phoneVerificationToken: verifiedToken,
       });
 
+      setIsLoading(false);
       if (coordinates) {
         useSettingsStore.getState().setUserCoordinates(coordinates);
       }
       useSettingsStore.getState().setDefaultLocation(selectedLocation);
 
       if (role === 'provider') {
+        if (newUser) {
+          try {
+            const baseUrl = getApiBaseUrl();
+            const expYears = experienceLevel.includes('5+') ? 8 : experienceLevel.includes('3-5') ? 4 : 2;
+            const radiusKm = workRadius.includes('Whole City') ? 25 : 5;
+
+            await authenticatedFetch(`${baseUrl}/api/providers/onboard`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: newUser.id,
+                name: newUser.name,
+                phone: newUser.phone,
+                category: selectedTrade,
+                experienceYears: expYears,
+                hourlyRate,
+                coverageRadiusKm: radiusKm,
+                availableSlots,
+                sector: newUser.sector || selectedLocation.split(',')[0].trim(),
+                coords: coordinates ? { lat: coordinates.latitude, lng: coordinates.longitude } : undefined,
+              }),
+            });
+          } catch (onboardErr) {
+            console.warn('[auth] Provider onboard sync warning:', onboardErr);
+          }
+        }
+
         toast.success(
           'Account Ready! (Karigar Pro)',
           `Registered as ${tradeInfo || 'Electrician'} in ${selectedLocation}`,
@@ -336,39 +406,44 @@ export default function AuthScreen() {
           `Welcome to Khidmat! Your location is set to ${selectedLocation}`,
         );
       }
-      handleClose();
-    }, 400);
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      setIsLoading(false);
+      toast.error('Registration Failed', err.message || 'Could not complete registration.');
+    }
   };
 
   // Quick Demo Login (strictly for development testing)
-  const handleQuickDemoLogin = (demoRole: UserRole) => {
+  const handleQuickDemoLogin = async (demoRole: UserRole) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsLoading(true);
-    setTimeout(() => {
+
+    if (demoRole === 'customer') {
+      await login({
+        id: 'usr_demo_customer',
+        name: 'Ahmed Hassan',
+        phone: '+92 300 1234567',
+        password: '1234',
+        email: 'ahmed.hassan@example.com',
+        role: 'customer',
+        sector: 'F-7',
+      });
       setIsLoading(false);
-      if (demoRole === 'customer') {
-        login({
-          id: 'usr_demo_customer',
-          name: 'Ahmed Hassan',
-          phone: '+92 300 1234567',
-          email: 'ahmed.hassan@example.com',
-          role: 'customer',
-          sector: 'F-7',
-        });
-        toast.success('Demo Customer', 'Logged in as Ahmed Hassan (Customer).');
-      } else {
-        login({
-          id: 'usr_demo_provider',
-          name: 'Tariq Mehmood (Electrician)',
-          phone: '+92 321 9876543',
-          email: 'tariq.services@example.com',
-          role: 'provider',
-          sector: 'G-11',
-        });
-        toast.success('Demo Provider', 'Logged in as Tariq Mehmood (Provider).');
-      }
-      handleClose();
-    }, 350);
+      toast.success('Demo Customer', 'Logged in as Ahmed Hassan (Customer).');
+    } else {
+      await login({
+        id: 'usr_demo_provider',
+        name: 'Tariq Mehmood',
+        phone: '+92 301 9876543',
+        password: '1234',
+        email: 'tariq.services@example.com',
+        role: 'provider',
+        sector: 'G-13',
+      });
+      setIsLoading(false);
+      toast.success('Demo Provider', 'Logged in as Tariq Mehmood (Provider).');
+    }
+    router.replace('/(tabs)');
   };
 
   return (
@@ -396,14 +471,16 @@ export default function AuthScreen() {
               </Text>
             </View>
           </View>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Close authentication"
-            onPress={handleClose}
-            className="h-9 w-9 items-center justify-center rounded-full bg-gray-100 active:bg-gray-200"
-          >
-            <Ionicons name="close" size={20} color={colors.gray500} />
-          </TouchableOpacity>
+          {isAuthenticated && (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Close authentication"
+              onPress={handleClose}
+              className="h-9 w-9 items-center justify-center rounded-full bg-gray-100 active:bg-gray-200"
+            >
+              <Ionicons name="close" size={20} color={colors.gray500} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ── STEP 1: INITIAL REGISTRATION & SIGN IN FORM ────────── */}
@@ -566,9 +643,11 @@ export default function AuthScreen() {
                     Full Name <Text className="text-red-500">*</Text>
                   </Text>
                   <View
-                    className={`flex-row items-center rounded-xl border bg-gray-50 px-3.5 py-3 ${
-                      fieldErrors.name ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
-                    }`}
+                    className="flex-row items-center rounded-xl border px-3.5 py-3"
+                    style={{
+                      borderColor: fieldErrors.name ? '#F87171' : '#E5E7EB',
+                      backgroundColor: fieldErrors.name ? 'rgba(254,242,242,0.6)' : '#F9FAFB',
+                    }}
                   >
                     <Ionicons name="person-outline" size={18} color={colors.gray400} />
                     <TextInput
@@ -598,9 +677,11 @@ export default function AuthScreen() {
                   Mobile Number <Text className="text-red-500">*</Text>
                 </Text>
                 <View
-                  className={`flex-row items-center rounded-xl border bg-gray-50 px-3.5 py-3 ${
-                    fieldErrors.phone ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
-                  }`}
+                  className="flex-row items-center rounded-xl border px-3.5 py-3"
+                  style={{
+                    borderColor: fieldErrors.phone ? '#F87171' : '#E5E7EB',
+                    backgroundColor: fieldErrors.phone ? 'rgba(254,242,242,0.6)' : '#F9FAFB',
+                  }}
                 >
                   <Ionicons name="call-outline" size={18} color={colors.gray400} />
                   <View className="ml-2.5 flex-row items-center gap-1">
@@ -640,7 +721,10 @@ export default function AuthScreen() {
 
                   {/* Detected / Selected Location Display Card */}
                   {selectedLocation ? (
-                    <View className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 flex-row items-center justify-between">
+                    <View
+                      className="rounded-xl border p-3 flex-row items-center justify-between"
+                      style={{ borderColor: '#A7F3D0', backgroundColor: 'rgba(236,253,245,0.7)' }}
+                    >
                       <View className="flex-row items-center gap-2.5 flex-1">
                         <View className="h-8 w-8 items-center justify-center rounded-lg bg-emerald-600">
                           <Ionicons name="location" size={16} color="#FFFFFF" />
@@ -658,7 +742,14 @@ export default function AuthScreen() {
                         accessibilityRole="button"
                         accessibilityLabel="Change location"
                         onPress={() => setIsLocationModalOpen(true)}
-                        className="rounded-lg bg-white px-2.5 py-1.5 border border-emerald-200 shadow-xs"
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: '#A7F3D0',
+                        }}
                       >
                         <Text className="text-xs font-bold text-emerald-800">Change</Text>
                       </TouchableOpacity>
@@ -737,9 +828,11 @@ export default function AuthScreen() {
                   Password / PIN <Text className="text-red-500">*</Text>
                 </Text>
                 <View
-                  className={`flex-row items-center rounded-xl border bg-gray-50 px-3.5 py-3 ${
-                    fieldErrors.password ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
-                  }`}
+                  className="flex-row items-center rounded-xl border px-3.5 py-3"
+                  style={{
+                    borderColor: fieldErrors.password ? '#F87171' : '#E5E7EB',
+                    backgroundColor: fieldErrors.password ? 'rgba(254,242,242,0.6)' : '#F9FAFB',
+                  }}
                 >
                   <Ionicons name="lock-closed-outline" size={18} color={colors.gray400} />
                   <TextInput
@@ -782,9 +875,8 @@ export default function AuthScreen() {
               disabled={isLoading}
               onPress={handleFormSubmit}
               activeOpacity={0.88}
-              className={`items-center justify-center rounded-2xl bg-primary py-4 px-6 shadow-sm active:bg-primaryActive ${
-                isLoading ? 'opacity-70' : ''
-              }`}
+              className="items-center justify-center rounded-2xl bg-primary py-4 px-6 active:bg-primaryActive"
+              style={{ opacity: isLoading ? 0.7 : 1 }}
             >
               {isLoading ? (
                 <View className="flex-row items-center gap-2">
@@ -871,25 +963,100 @@ export default function AuthScreen() {
               </Text>
             </View>
 
-            {/* 4-digit code box */}
+            {/* 4-digit code: 4 distinct boxes in a row */}
             <View className="mb-6">
-              <Text className="text-xs font-bold text-gray-700 text-center mb-2">
+              <Text className="text-xs font-bold text-gray-700 text-center mb-3">
                 Enter 4-Digit Code (SMS Code Likhein)
               </Text>
-              <View className="flex-row justify-center gap-3">
-                {[0, 1, 2, 3].map((idx) => (
-                  <View
-                    key={idx}
-                    className="h-14 w-14 items-center justify-center rounded-2xl border-2 border-primary bg-orange-50/40"
-                  >
-                    <Text className="text-2xl font-extrabold text-gray-900">
-                      {otpCode[idx] ?? '•'}
-                    </Text>
-                  </View>
-                ))}
+
+              <View className="relative mx-auto items-center justify-center">
+                {/* 4 distinct single-digit boxes */}
+                <View className="flex-row items-center justify-center gap-3">
+                  {[0, 1, 2, 3].map((index) => {
+                    const digit = otpCode[index] || '';
+                    const isCurrent = (index === otpCode.length || (index === 3 && otpCode.length === 4)) && isOtpFocused;
+                    const isFilled = Boolean(digit);
+
+                    let boxBorderColor = '#E5E7EB'; // gray-200
+                    let boxBg = '#F9FAFB'; // gray-50
+                    if (fieldErrors.otp) {
+                      boxBorderColor = '#F87171'; // red-400
+                      boxBg = 'rgba(254,242,242,0.8)';
+                    } else if (isCurrent) {
+                      boxBorderColor = colors.primary;
+                      boxBg = '#FFF7ED'; // orange-50
+                    } else if (isFilled) {
+                      boxBorderColor = colors.primary;
+                      boxBg = '#FFFFFF';
+                    }
+
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        activeOpacity={0.85}
+                        onPress={() => otpInputRef.current?.focus()}
+                        style={{
+                          width: 56,
+                          height: 64,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 16,
+                          borderWidth: 2,
+                          borderColor: boxBorderColor,
+                          backgroundColor: boxBg,
+                        }}
+                      >
+                        <Text className="text-3xl font-black text-gray-900">
+                          {digit}
+                        </Text>
+                        {isCurrent && !digit && (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              bottom: 12,
+                              height: 4,
+                              width: 20,
+                              borderRadius: 999,
+                              backgroundColor: colors.primary,
+                            }}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Invisible input capturing native touch, typing, backspace, and SMS autofill */}
+                <TextInput
+                  ref={otpInputRef}
+                  value={otpCode}
+                  onChangeText={(value) => {
+                    const cleanValue = value.replace(/\D/g, '').slice(0, 4);
+                    setOtpCode(cleanValue);
+                    if (fieldErrors.otp) setFieldErrors((current) => ({ ...current, otp: undefined }));
+                  }}
+                  onFocus={() => setIsOtpFocused(true)}
+                  onBlur={() => setIsOtpFocused(false)}
+                  keyboardType="number-pad"
+                  textContentType="oneTimeCode"
+                  autoComplete="sms-otp"
+                  maxLength={4}
+                  autoFocus
+                  accessibilityLabel="SMS verification code"
+                  caretHidden
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    opacity: 0,
+                  }}
+                />
               </View>
+
               {fieldErrors.otp && (
-                <Text className="mt-2 text-xs font-bold text-red-500 text-center">
+                <Text className="mt-2.5 text-xs font-bold text-red-500 text-center">
                   {fieldErrors.otp}
                 </Text>
               )}
@@ -910,13 +1077,28 @@ export default function AuthScreen() {
 
             <TouchableOpacity
               onPress={() => {
-                setOtpCode('1234');
-                toast.info('Code Resent', 'Verification code 1234 sent via SMS.');
+                const cleanPhone = phone.replace(/[^0-9]/g, '');
+                const formattedPhone = cleanPhone.startsWith('92')
+                  ? `+${cleanPhone}`
+                  : cleanPhone.startsWith('0')
+                  ? `+92${cleanPhone.slice(1)}`
+                  : `+92${cleanPhone}`;
+                fetch(`${getApiBaseUrl()}/api/auth/phone/request`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ phone: formattedPhone }),
+                })
+                  .then(async (response) => ({ response, body: await response.json() }))
+                  .then(({ response, body }) => {
+                    if (!response.ok) throw new Error(body.message);
+                    toast.info('Code dobara bhej diya', 'SMS check karein.');
+                  })
+                  .catch((error) => toast.error('Abhi code nahi bheja', error.message));
               }}
               className="items-center py-2"
             >
               <Text className="text-xs font-bold text-primary">
-                Didn't get code? Resend SMS
+                Didn&apos;t get code? Resend SMS
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -1003,7 +1185,96 @@ export default function AuthScreen() {
               </View>
             </View>
 
-            {/* 3. Coverage Radius */}
+            {/* 3. Base Visit / Hourly Rate */}
+            <View className="mb-5">
+              <Text className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                Standard Visit Rate (Ujrat / Fees)
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {[
+                  { label: 'Rs 800 (Visit)', rate: 800 },
+                  { label: 'Rs 1,200 (Standard)', rate: 1200 },
+                  { label: 'Rs 1,800 (Expert)', rate: 1800 },
+                  { label: 'Rs 2,500 (Heavy)', rate: 2500 },
+                ].map((item) => {
+                  const isSelected = hourlyRate === item.rate;
+                  return (
+                    <TouchableOpacity
+                      key={item.rate}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setHourlyRate(item.rate);
+                      }}
+                      className={`rounded-xl border py-2.5 px-3 ${
+                        isSelected
+                          ? 'border-primary bg-orange-50'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-bold ${
+                          isSelected ? 'text-primary' : 'text-gray-700'
+                        }`}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 4. Availability Timing Slots */}
+            <View className="mb-5">
+              <Text className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                Available Working Slots (Auqaat-e-Kaar)
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {[
+                  { id: 'morning', label: 'Subah (9 AM - 1 PM)' },
+                  { id: 'afternoon', label: 'Dopahar (1 PM - 5 PM)' },
+                  { id: 'evening', label: 'Shaam (5 PM - 9 PM)' },
+                  { id: 'flexible', label: 'Pura Din (Flexible)' },
+                ].map((slot) => {
+                  const isSelected = availableSlots.includes(slot.id);
+                  return (
+                    <TouchableOpacity
+                      key={slot.id}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        if (isSelected) {
+                          if (availableSlots.length > 1) {
+                            setAvailableSlots(availableSlots.filter((s) => s !== slot.id));
+                          }
+                        } else {
+                          setAvailableSlots([...availableSlots, slot.id]);
+                        }
+                      }}
+                      className={`flex-row items-center gap-1.5 rounded-xl border py-2.5 px-3 ${
+                        isSelected
+                          ? 'border-primary bg-orange-50'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <Ionicons
+                        name={isSelected ? 'checkbox' : 'square-outline'}
+                        size={16}
+                        color={isSelected ? colors.primary : colors.gray400}
+                      />
+                      <Text
+                        className={`text-xs font-bold ${
+                          isSelected ? 'text-primary' : 'text-gray-700'
+                        }`}
+                      >
+                        {slot.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 5. Coverage Radius */}
             <View className="mb-6">
               <Text className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                 Service Coverage (Kaam ka Daera)
@@ -1118,9 +1389,8 @@ export default function AuthScreen() {
                       setIsLocationModalOpen(false);
                       setLocationSearch('');
                     }}
-                    className={`flex-row items-center justify-between border-b border-gray-100 py-3.5 ${
-                      isSelected ? 'bg-orange-50/50 px-2 rounded-lg' : ''
-                    }`}
+                    className="flex-row items-center justify-between border-b border-gray-100 py-3.5"
+                    style={isSelected ? { backgroundColor: '#FFF7ED', paddingHorizontal: 8, borderRadius: 8 } : undefined}
                   >
                     <View className="flex-row items-center gap-2.5">
                       <Ionicons

@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '@/lib/theme/colors';
 import { ExplainableRationaleBadge } from './ExplainableRationaleBadge';
 
 export interface ProviderJob {
@@ -14,7 +13,7 @@ export interface ProviderJob {
   urgency: 'high' | 'normal';
   problemDescription: string;
   estimatedFare: number;
-  status: 'pending' | 'accepted' | 'completed' | 'declined';
+  status: 'pending' | 'accepted' | 'on_the_way' | 'in_progress' | 'completed' | 'declined';
   explainableRationale: string;
 }
 
@@ -22,16 +21,20 @@ interface JobCardProps {
   job: ProviderJob;
   onAccept: (id: string) => void;
   onDecline: (id: string) => void;
+  onOnMyWay?: (id: string) => void;
+  onStart: (id: string) => void;
   onComplete: (id: string) => void;
 }
 
-export function JobCard({ job, onAccept, onDecline, onComplete }: JobCardProps) {
+export function JobCard({ job, onAccept, onDecline, onOnMyWay, onStart, onComplete }: JobCardProps) {
   const handleCall = () => {
     Linking.openURL(`tel:${job.customerPhone}`);
   };
 
   const isPending = job.status === 'pending';
   const isAccepted = job.status === 'accepted';
+  const isOnMyWay = job.status === 'on_the_way';
+  const isInProgress = job.status === 'in_progress';
   const isCompleted = job.status === 'completed';
 
   return (
@@ -112,15 +115,50 @@ export function JobCard({ job, onAccept, onDecline, onComplete }: JobCardProps) 
       )}
 
       {isAccepted && (
+        <View className="mt-4 flex-row gap-2">
+          {onOnMyWay && (
+            <TouchableOpacity
+              onPress={() => onOnMyWay(job.id)}
+              className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-3 active:bg-blue-700"
+            >
+              <Ionicons name="bicycle" size={18} color="#FFFFFF" />
+              <Text className="text-xs font-black text-white">🛵 Raste Mein Hoon</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            onPress={() => onStart(job.id)}
+            className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-green-600 py-3 active:bg-green-700"
+          >
+            <Ionicons name="play-circle-outline" size={18} color="#FFFFFF" />
+            <Text className="text-xs font-black text-white">Kaam Shuru</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {isOnMyWay && (
+        <View className="mt-4 space-y-2">
+          <View className="rounded-xl bg-blue-50 p-2.5 border border-blue-200 flex-row items-center justify-center">
+            <Ionicons name="navigate-circle" size={16} color="#1D4ED8" />
+            <Text className="ml-1.5 text-xs font-black text-blue-900">Aap raste mein hain • Customer informed</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => onStart(job.id)}
+            className="flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 active:bg-green-700"
+          >
+            <Ionicons name="play-circle-outline" size={18} color="#FFFFFF" />
+            <Text className="text-sm font-bold text-white">Pohnch Gaye • Kaam Shuru</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {isInProgress && (
         <View className="mt-4">
           <TouchableOpacity
             onPress={() => onComplete(job.id)}
             className="flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 active:bg-green-700"
           >
             <Ionicons name="checkmark-done" size={18} color="#FFFFFF" />
-            <Text className="text-sm font-bold text-white">
-              Mark Service Completed
-            </Text>
+            <Text className="text-sm font-bold text-white">Kaam mukammal • Complete</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -129,7 +167,7 @@ export function JobCard({ job, onAccept, onDecline, onComplete }: JobCardProps) 
         <View className="mt-3 flex-row items-center justify-center gap-2 rounded-xl bg-green-50 p-2">
           <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
           <Text className="text-xs font-bold text-green-800">
-            Job Completed & Payment Received
+            Kaam mukammal • Payment alag record karein
           </Text>
         </View>
       )}

@@ -95,59 +95,71 @@ export function DuesLedgerCard() {
 
       {/* Dues Items List */}
       <View className="mt-3 space-y-2">
-        {dues.slice(0, 3).map((item) => (
-          <View
-            key={item.id}
-            className="flex-row items-center justify-between rounded-xl bg-white p-3 border border-gray-100"
-          >
-            <View className="flex-1">
-              <View className="flex-row items-center gap-2">
-                <Text className="text-xs font-bold text-gray-900">
-                  {item.customerName}
-                </Text>
-                <View
-                  className={`rounded-full px-2 py-0.5 ${
-                    item.status === 'pending'
-                      ? 'bg-amber-100'
-                      : 'bg-green-100'
-                  }`}
-                >
-                  <Text
-                    className={`text-[10px] font-bold ${
+        {dues.length === 0 ? (
+          <View className="items-center justify-center rounded-xl bg-white p-4 border border-dashed border-amber-200">
+            <Ionicons name="receipt-outline" size={24} color="#D97706" />
+            <Text className="mt-1 text-xs font-semibold text-gray-600">
+              No customer dues recorded
+            </Text>
+            <Text className="text-[10px] text-gray-400">
+              Tap 'Record Due' to record customer balances.
+            </Text>
+          </View>
+        ) : (
+          dues.slice(0, 3).map((item) => (
+            <View
+              key={item.id}
+              className="flex-row items-center justify-between rounded-xl bg-white p-3 border border-gray-100"
+            >
+              <View className="flex-1">
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-xs font-bold text-gray-900">
+                    {item.customerName}
+                  </Text>
+                  <View
+                    className={`rounded-full px-2 py-0.5 ${
                       item.status === 'pending'
-                        ? 'text-amber-800'
-                        : 'text-green-800'
+                        ? 'bg-amber-100'
+                        : 'bg-green-100'
                     }`}
                   >
-                    {item.status === 'pending' ? 'Pending' : 'Paid'}
-                  </Text>
+                    <Text
+                      className={`text-[10px] font-bold ${
+                        item.status === 'pending'
+                          ? 'text-amber-800'
+                          : 'text-green-800'
+                      }`}
+                    >
+                      {item.status === 'pending' ? 'Pending' : 'Paid'}
+                    </Text>
+                  </View>
                 </View>
+                <Text className="text-[11px] text-gray-500 mt-0.5">
+                  {item.description} • {item.sector}
+                </Text>
               </View>
-              <Text className="text-[11px] text-gray-500 mt-0.5">
-                {item.description} • {item.sector}
-              </Text>
-            </View>
 
-            <View className="items-end space-y-1">
-              <Text className="text-xs font-bold text-gray-900">
-                Rs {item.amount.toLocaleString()}
-              </Text>
-              {item.status === 'pending' ? (
-                <TouchableOpacity
-                  onPress={() => {
-                    markAsPaid(item.id);
-                    toast.success('Payment Received', `Rs ${item.amount.toLocaleString()} received from ${item.customerName}`);
-                  }}
-                  className="rounded-lg bg-green-50 px-2 py-1 border border-green-200 active:bg-green-100 flex-row items-center gap-1.5"
-                >
-                  <Text className="text-[10px] font-bold text-green-700">
-                    Mark Paid
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
+              <View className="items-end space-y-1">
+                <Text className="text-xs font-bold text-gray-900">
+                  Rs {item.amount.toLocaleString()}
+                </Text>
+                {item.status === 'pending' ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      markAsPaid(item.id);
+                      toast.success('Payment Received', `Rs ${item.amount.toLocaleString()} received from ${item.customerName}`);
+                    }}
+                    className="rounded-lg bg-green-50 px-2 py-1 border border-green-200 active:bg-green-100 flex-row items-center gap-1.5"
+                  >
+                    <Text className="text-[10px] font-bold text-green-700">
+                      Mark Paid
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </View>
-          </View>
-        ))}
+          ))
+        )}
       </View>
 
       {/* Record Due Modal */}

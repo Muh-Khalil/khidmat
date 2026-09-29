@@ -1,3 +1,4 @@
+import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -13,26 +14,29 @@ export default function RootLayout() {
       <KeyboardProvider>
         <StatusBar style="dark" />
         <Stack
+          initialRouteName="(tabs)"
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: colors.white },
           }}
         >
-          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="auth"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_bottom',
+            }}
+          />
           <Stack.Screen
             name="bookings/[id]"
             options={{
               headerShown: false,
             }}
           />
-          <Stack.Screen
-            name="auth"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-              headerShown: false,
-            }}
-          />
+          <Stack.Screen name="requests/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="providers/external" options={{ headerShown: false }} />
+          <Stack.Screen name="provider/crm" options={{ headerShown: false }} />
         </Stack>
         <ToastNotification />
       </KeyboardProvider>

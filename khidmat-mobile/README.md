@@ -1,134 +1,153 @@
 # Khidmat — Mobile
 
-Chat-first mobile client for the Khidmat AI service orchestrator. The user types what they need ("AC stopped working in G-13, need someone today") and the in-app agent walks through understanding → searching → ranking → recommending → booking, narrating each step as a chat thread.
+Chat-first, voice-enabled mobile client for the Khidmat AI service orchestrator. Designed for customers and service providers in Pakistan, featuring conversational booking, voice messaging, marketplace quotes, a provider mini-CRM, and a customer dues ledger.
 
-Built with Expo, React Native, Zustand, and TypeScript. Pairs with any server that implements the [wire contract](#wire-contract) below.
+Built with **Expo SDK 54**, **React Native 0.81**, **Zustand**, and **NativeWind (Tailwind CSS)**.
 
-## Status
+---
 
-Currently runs against an in-process mock agent at [lib/agent/mockAgent.ts](lib/agent/mockAgent.ts). Wiring to a real backend is the next integration step — swap the mock for an SSE client that hits `EXPO_PUBLIC_API_BASE_URL/chat`.
+## Key Features
 
-## Stack
+1. **Agentic Voice & Text Chat (`app/(tabs)/index.tsx`)**:
+   - Speak or type in Urdu, Roman Urdu, or English (e.g., *"AC cooling nahi kar raha, G-13 mein aaj sham ko koi bhej dein"*).
+   - In-app audio recording with automatic transcription and dialect normalization.
+   - Real-time Server-Sent Events (SSE) streaming revealing agent thoughts, understanding, provider search, and confirmed bookings.
 
-| Layer | Tech |
-|-------|------|
-| Framework | Expo SDK 54 + Expo Router |
-| Runtime | React Native 0.81.5, React 19 |
-| Styling | NativeWind + Tailwind |
-| State | Zustand + AsyncStorage (persisted) |
-| Language | TypeScript (strict) |
+2. **Phone Authentication & OTP (`app/auth.tsx`)**:
+   - Support for customer and service provider roles.
+   - Phone verification via SMS OTP (powered by Twilio Verify v2 in production, or instant dev code `1234`).
+   - Secure PIN authentication and session persistence.
 
-## Screens
+3. **Customer Dues & "Udhar" Ledger (`app/(tabs)/dues.tsx`)**:
+   - Tracks credit balances, past payments, and pending dues between customers and technicians.
 
-| Route | Purpose |
-|-------|---------|
-| `app/(tabs)/index.tsx` | Chat — single input; agent reasoning unfolds as a thread |
-| `app/(tabs)/bookings.tsx` | Bookings list (from AsyncStorage) |
-| `app/bookings/[id].tsx` | Booking detail + preserved agent reasoning + cancel |
-| `app/(tabs)/settings.tsx` | Default location + about + clear-all |
+4. **Bookings & Job Tracking (`app/(tabs)/bookings.tsx` & `app/bookings/[id].tsx`)**:
+   - Persisted booking records with operational lifecycle tracking (`requested` → `matched` → `dispatched` → `accepted` → `in_progress` → `completed`).
+   - Retains the conversational reasoning and context behind each booking.
 
-## Project layout
+5. **Provider Mini-CRM (`app/provider/crm.tsx`)**:
+   - Enables independent technicians to track offline clients, record appointments, and schedule automated reminders.
+
+6. **Marketplace Bids & External Claims (`app/requests/[id].tsx` & `app/providers/external.tsx`)**:
+   - Compare multiple quotes and visit fees from nearby providers before booking.
+   - Discover and claim third-party business listings (Google Places) via mobile phone verification.
+
+---
+
+## App Routes & Screens
+
+| Route | Screen / Purpose |
+|---|---|
+| `app/auth.tsx` | Phone registration, PIN login, and SMS OTP verification modal |
+| `app/(tabs)/index.tsx` | Main AI conversational assistant (Voice recording + Chat thread) |
+| `app/(tabs)/bookings.tsx` | Active and historical bookings list with status badges |
+| `app/bookings/[id].tsx` | Booking details, technician info, and cancellation options |
+| `app/(tabs)/dues.tsx` | Customer dues & credit ledger ("Khata") |
+| `app/(tabs)/settings.tsx` | Sector selector (Islamabad F/G/E sectors), backend URL status, profile |
+| `app/provider/crm.tsx` | Provider offline customer book & appointment calendar |
+| `app/providers/external.tsx` | Google Places external technician discovery and claim challenge |
+| `app/requests/[id].tsx` | Marketplace request status & provider quote comparison |
+
+---
+
+## Project Layout
 
 ```
 app/
-├── (tabs)/             chat / bookings / settings screens + tab layout
-├── bookings/[id].tsx   booking detail + preserved agent thread
-└── _layout.tsx         root stack + keyboard provider
-components/             ChatBubble, ProviderCard, InputBar, StatusBadge,
-                        ExtractedFieldsRow, ChatLoaders, ExamplePromptChip, Button
+├── (tabs)/
+│   ├── _layout.tsx         # Bottom tab navigation (Chat, Bookings, Dues, Settings)
+│   ├── index.tsx           # Voice & text AI assistant screen
+│   ├── bookings.tsx        # Customer booking history
+│   ├── dues.tsx            # Dues / credit ledger screen
+│   └── settings.tsx        # Settings, profile, and sector selection
+├── bookings/[id].tsx       # Individual booking detail view
+├── provider/crm.tsx        # Provider mini-CRM for offline clients & calendar
+├── providers/external.tsx  # Google Places claiming screen
+├── requests/[id].tsx       # Marketplace request quotes view
+├── auth.tsx                # Phone authentication & OTP verification
+└── _layout.tsx             # Root stack layout & keyboard providers
+components/
+├── ChatBubble.tsx          # Conversational messages & agent narration bubbles
+├── ProviderCard.tsx        # Technician profile card with rating & distance
+├── InputBar.tsx            # Text input with microphone audio recorder button
+├── StatusBadge.tsx         # Job lifecycle status indicator
+└── ChatLoaders.tsx         # Agent thinking & searching skeleton loaders
 lib/
-├── agent/
-│   ├── mockAgent.ts    in-process agent (understanding → … → booking)
-│   ├── types.ts        AgentEvent wire contract (mirrors server)
-│   └── findEvent.ts    typed AgentEvent finder
-├── categories.ts       service-category labels / emoji / nouns
-├── mock/providers.ts   15-entry provider catalog + sector coords
-├── stores/             Zustand stores (bookings, settings) + storage keys
-├── theme/colors.ts     named colors for JS color props
-└── util/               distance, time, id, location, text, schedule, sectors
+├── agent/                  # SSE stream parser and AgentEvent wire contract
+├── stores/                 # Zustand stores (useAuthStore, useBookingsStore, useSettingsStore)
+├── api/                    # HTTP client for REST & Voice endpoints
+└── util/                   # Audio recording, Haversine geo distance, date formatters
 ```
 
-## Local development
+---
 
-Prerequisites: Node 20, npm, Expo Go on your phone (or an Android/iOS simulator).
+## Local Development & Setup
+
+### Prerequisites
+
+- **Node.js**: v20 or higher
+- **Expo Go**: Installed on your Android device (Google Play Store) or iOS device (App Store)
+- Active **`khidmat-server`** running on your local network
+
+---
+
+### Step 1: Install Dependencies
+
+```bash
+cd khidmat-mobile
+npm install
+```
+
+---
+
+### Step 2: Configure Environment
 
 ```bash
 cp .env.example .env
-# Edit .env if your server is on a different host/port
-npm install
-npm run start
-# or
-npx expo start --clear
-
-# npx expo export --platform web 
-# npx expo export --platform android
-# npx expo export --platform android 2>&1
 ```
 
-Scan the QR with Expo Go (Android) or the Camera app (iOS). When running on a physical device, set `EXPO_PUBLIC_API_BASE_URL` to your machine's LAN IP — `localhost` will not resolve.
+Edit `.env`:
+```ini
+# When testing on a PHYSICAL PHONE with Expo Go:
+# Replace localhost with your development PC's local LAN IP (e.g. 192.168.1.50)
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.XX:5000
 
-### Scripts
-
-| Script | What |
-|--------|------|
-| `npm start` | `expo start` — Metro dev server |
-| `npm run android` | Build & open on connected Android device |
-| `npm run ios` | iOS simulator (macOS only) |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run lint` | Expo ESLint |
-
-## Environment variables
-
-| Var | Required | Default | Purpose |
-|-----|----------|---------|---------|
-| `EXPO_PUBLIC_API_BASE_URL` | yes | `http://localhost:5000` | Base URL of the Khidmat server. |
-
-## State / persistence
-
-The mobile app is the source of truth for bookings:
-
-- `useBookingsStore` persists to AsyncStorage under the `khidmat-bookings` key.
-- Every `/chat` request sends the FE's current bookings to the server as context.
-- The server emits `booking_update` / `booking_cancel` / `booking_query` events as *intents*; the FE validates and applies them locally.
-- Change servers and the user's bookings stay put.
-
-## Wire contract
-
-Pairs with any server that implements this. See [lib/agent/types.ts](lib/agent/types.ts) for the authoritative TypeScript shapes.
-
-### Request: `POST /chat`
-
-```ts
-{
-  message: string,            // user input, any language
-  sessionId?: string,         // UUID per chat thread; omit for one-shot
-  defaultLocation?: string,   // sector from Settings, e.g. 'G-13'
-  bookings?: Booking[],       // FE's persisted bookings
-}
+# When testing on Web or Desktop:
+# EXPO_PUBLIC_API_BASE_URL=http://localhost:5000
 ```
 
-### Response: SSE stream of `AgentEvent`
+> **Important**: Physical mobile phones cannot resolve `http://localhost`. Ensure your phone and PC are connected to the same Wi-Fi network and use your PC's local IP address (find it via `ipconfig` on Windows).
 
-Content-Type `text/event-stream`, one `AgentEvent` per `data:` frame. Event types:
+---
 
-- `thought` — agent narration (interleaved across flows)
-- `understanding`, `searching`, `ranking`, `recommendation`, `booking`, `confirmed`, `reminder_scheduled` — new-booking flow
-- `awaiting_user` — pause and ask; FE resends with same `sessionId` to resume
-- `booking_update`, `booking_cancel`, `booking_query` — intents to mutate existing bookings (FE applies)
+### Step 3: Start Expo Metro Bundler
 
-Exact shapes: [lib/agent/types.ts](lib/agent/types.ts). When pairing with a partner's server, this file is the integration spec.
+```bash
+npx expo start -c
+```
 
-## Multilingual
+- **Android (Expo Go)**: Scan the QR code displayed in your terminal using the Expo Go app.
+- **iOS (Expo Go)**: Scan the QR code using the built-in iOS Camera app.
+- **Web**: Press `w` in the terminal to open the web preview.
 
-Inputs in English, Urdu, Roman Urdu, or mixed are accepted — the LLM behind the server handles them natively. `awaiting_user` follow-up questions render in English regardless of input language (server-side limitation).
+---
 
-## Limitations
+## Available Scripts
 
-- No authentication; single anonymous user.
-- Provider catalog is a 15-entry mock for Islamabad sectors only (no Maps integration).
-- Reminders are scheduled as local notifications by the FE; no push/SMS infra.
-- Typecheck and lint only; no test suite.
+| Script | Command | Purpose |
+|---|---|---|
+| `npm start` | `expo start` | Starts the Metro bundler |
+| `npm run android` | `expo run:android` | Builds and launches on connected Android emulator/device |
+| `npm run ios` | `expo run:ios` | Launches in iOS simulator (macOS only) |
+| `npm run typecheck` | `tsc --noEmit` | Strict TypeScript verification |
+| `npm run lint` | `eslint .` | Linting with Expo ESLint configuration |
 
-## How Antigravity was used
+---
 
-Google Antigravity was the AI coding assistant that wrote the mobile screens, components, and state stores from prescriptive prompts authored by the developer. Build-time only — Antigravity is not part of the runtime. Prompt history: [docs/antigravity-prompts/](docs/antigravity-prompts/).
+## Wire Contract (Mobile ↔ Server)
+
+The mobile client communicates with the server via:
+1. **REST Endpoints**: `/api/auth/*`, `/api/jobs/*`, `/api/dues/*`, `/api/crm/*`, `/api/voice/transcribe`.
+2. **SSE Streaming (`POST /chat`)**: Streams real-time `AgentEvent` payloads (`thought`, `understanding`, `searching`, `ranking`, `recommendation`, `booking`, `confirmed`).
+
+See [lib/agent/types.ts](file:///d:/Dev/fyp-project/khidmat-mobile/lib/agent/types.ts) for full TypeScript wire interfaces.

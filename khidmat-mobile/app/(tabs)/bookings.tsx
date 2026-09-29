@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,26 +11,39 @@ import { useRouter } from 'expo-router';
 
 import { StatusBadge } from '@/components/StatusBadge';
 import { useBookingsStore } from '@/lib/stores/useBookingsStore';
+import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { categoryEmoji, categoryServiceLabel } from '@/lib/categories';
 import { colors } from '@/lib/theme/colors';
 import { pluralize } from '@/lib/util/text';
+import { useRequestsStore } from '@/lib/stores/useRequestsStore';
 
 export default function BookingsScreen() {
   const router = useRouter();
   const rawBookings = useBookingsStore((s) => s.bookings);
+  const fetchBookings = useBookingsStore((s) => s.fetchBookings);
+  const user = useAuthStore((s) => s.user);
+  const requests = useRequestsStore((s) => s.requests);
+  const fetchRequests = useRequestsStore((s) => s.fetchRequests);
+
   const bookings = useMemo(
     () => [...rawBookings].sort((a, b) => b.createdAt - a.createdAt),
     [rawBookings],
   );
   const [refreshing, setRefreshing] = useState(false);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    // Simulate a brief refresh
-    setTimeout(() => setRefreshing(false), 600);
-  }, []);
+  useEffect(() => {
+    fetchBookings(user?.id || 'usr_demo_customer');
+    fetchRequests();
+  }, [fetchBookings, fetchRequests, user?.id]);
 
-  if (bookings.length === 0) {
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchBookings(user?.id || 'usr_demo_customer');
+    await fetchRequests();
+    setRefreshing(false);
+  }, [fetchBookings, fetchRequests, user?.id]);
+
+  if (bookings.length === 0 && requests.length === 0) {
     return (
       <SafeAreaView className="flex-1 bg-white" edges={['top']}>
         <View className="border-b border-gray-50 px-5 pb-3 pt-4">
@@ -77,6 +90,20 @@ export default function BookingsScreen() {
           />
         }
       >
+        {requests.filter((request) => request.status !== 'booked').map((request) => (
+          <Pressable
+            key={request.id}
+            onPress={() => router.push(`/requests/${request.id}` as any)}
+            className="mb-3 rounded-2xl border border-orange-100 bg-orange-50 p-4 active:bg-orange-100"
+          >
+            <View className="flex-row items-center justify-between">
+              <Text className="text-[15px] font-black text-gray-900">Provider ke jawab</Text>
+              <View className="rounded-full bg-white px-3 py-1"><Text className="text-xs font-bold text-orange-700">{request.responseCount || 0} jawab</Text></View>
+            </View>
+            <Text className="mt-2 text-sm text-gray-700" numberOfLines={2}>{request.issueDescription}</Text>
+            <Text className="mt-2 text-xs font-semibold text-gray-500">{request.sector} • {request.requestedTimeLabel}</Text>
+          </Pressable>
+        ))}
         {bookings.map((booking) => (
           <Pressable
             key={booking.id}

@@ -4,8 +4,9 @@ import type { AgentContext } from './mockAgent';
 import type { Provider } from '../mock/providers';
 
 import { getApiBaseUrl } from '../util/apiConfig';
-
-const API_BASE_URL = getApiBaseUrl();
+import { useAuthStore } from '../stores/useAuthStore';
+import { useBookingsStore } from '../stores/useBookingsStore';
+import { authenticatedFetch } from '../services/authenticatedFetch';
 
 /**
  * Runs the live LangGraph agent on khidmat-server via SSE.
@@ -16,20 +17,27 @@ export async function* runLiveAgent(
   ctx: AgentContext,
   sessionId?: string,
 ): AsyncGenerator<AgentEvent> {
-  const url = `${API_BASE_URL}/chat`;
+  const url = `${getApiBaseUrl()}/chat`;
+  const user = useAuthStore.getState().user;
+  const bookings = useBookingsStore.getState().bookings;
 
   try {
-    const response = await fetch(url, {
+    const response = await authenticatedFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
+        'x-user-id': user?.id || 'usr_demo_customer',
       },
       body: JSON.stringify({
         message: input,
         defaultLocation: ctx.defaultLocation,
         coordinates: ctx.coordinates,
         sessionId,
+        customerId: user?.id,
+        customerName: user?.name,
+        customerPhone: user?.phone,
+        bookings,
       }),
     });
 
@@ -86,7 +94,8 @@ export async function* confirmLiveBooking(
  */
 export async function transcribeAudioVoiceNote(audioBase64: string): Promise<string | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/voice/transcribe`, {
+    const baseUrl = getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/voice/transcribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

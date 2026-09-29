@@ -60,23 +60,6 @@ export function ProviderCard({
             >
               <Text style={{ fontSize: 24 }}>{categoryEmoji(provider.category)}</Text>
             </View>
-            <View
-              style={{
-                position: 'absolute',
-                bottom: -3,
-                right: -3,
-                backgroundColor: '#16A34A',
-                borderRadius: 10,
-                height: 18,
-                width: 18,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1.5,
-                borderColor: '#FFFFFF',
-              }}
-            >
-              <Ionicons name="checkmark" size={11} color="#FFFFFF" />
-            </View>
           </View>
 
           {/* Name & Category */}
@@ -113,7 +96,7 @@ export function ProviderCard({
         >
           <Ionicons name="sparkles" size={12} color="#1D4ED8" />
           <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8', marginLeft: 4 }}>
-            AI Match
+            Kyun mila?
           </Text>
         </TouchableOpacity>
       </View>
@@ -153,11 +136,11 @@ export function ProviderCard({
 
         <Text style={{ color: '#D1D5DB' }}>•</Text>
 
-        {/* Fast Service Badge */}
+        {/* Registration status: do not imply identity verification without evidence. */}
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Ionicons name="shield-checkmark" size={13} color="#16A34A" />
+          <Ionicons name="person-circle-outline" size={13} color="#4B5563" />
           <Text style={{ fontSize: 11, fontWeight: '600', color: '#166534', marginLeft: 3 }}>
-            Verified
+            Khidmat profile
           </Text>
         </View>
       </View>
@@ -179,7 +162,7 @@ export function ProviderCard({
         {/* Left: Price */}
         <View>
           <Text style={{ fontSize: 10, fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            Estimated Fare
+            Andaza • Final nahi
           </Text>
           <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', marginTop: 2 }}>
             {provider.priceRange}
@@ -255,7 +238,7 @@ export function ProviderCard({
       >
         <Ionicons name="calendar-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
         <Text style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF' }}>
-          Book {dayLabel} at {suggestedSlot}
+          Request bhejein • {dayLabel} {suggestedSlot}
         </Text>
         <Ionicons name="arrow-forward" size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
       </TouchableOpacity>
@@ -275,8 +258,8 @@ export function ProviderCard({
                   <Ionicons name="sparkles" size={18} color="#1D4ED8" />
                 </View>
                 <View>
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>AI Match Rationale</Text>
-                  <Text style={{ fontSize: 11, color: '#6B7280' }}>Explainable Matchmaker Agent</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>Yeh provider kyun?</Text>
+                  <Text style={{ fontSize: 11, color: '#6B7280' }}>Faasla, kaam aur waqt dekha gaya</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setShowExplainModal(false)} style={{ padding: 4 }}>
@@ -285,14 +268,14 @@ export function ProviderCard({
             </View>
 
             <Text style={{ marginTop: 12, fontSize: 13, color: '#4B5563', lineHeight: 18 }}>
-              Khidmat AI analyzed spatial coordinates, verified skill tags, and customer ratings for <Text style={{ fontWeight: '700', color: '#111827' }}>{provider.name}</Text>:
+              Aap ki baat ke mutabiq <Text style={{ fontWeight: '700', color: '#111827' }}>{provider.name}</Text> qareeb aur munasib lagte hain. Provider ka jawab abhi zaroori hai.
             </Text>
 
             <View style={{ marginTop: 12, gap: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#F3F4F6' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Ionicons name="location-outline" size={18} color="#EA580C" style={{ marginRight: 8 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>Spatial Proximity</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>Aap se faasla</Text>
                 </View>
                 <Text style={{ fontSize: 13, fontWeight: '800', color: '#15803D' }}>{distanceKm} km (Sector {provider.sector})</Text>
               </View>
@@ -300,22 +283,22 @@ export function ProviderCard({
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#F3F4F6' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Ionicons name="git-network-outline" size={18} color="#2563EB" style={{ marginRight: 8 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>Skill Cosine Match</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>Kaam ki qisam</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#15803D' }}>98.2% Compatibility</Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#15803D' }}>Munasib category</Text>
               </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#F3F4F6' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Ionicons name="star-outline" size={18} color="#D97706" style={{ marginRight: 8 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>Customer Rating</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>Profile rating</Text>
                 </View>
                 <Text style={{ fontSize: 13, fontWeight: '800', color: '#111827' }}>{provider.rating} ★ ({provider.reviewCount} reviews)</Text>
               </View>
             </View>
 
             <View style={{ marginTop: 12, backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#DBEAFE' }}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E40AF', textTransform: 'uppercase' }}>Agent Decision Log:</Text>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E40AF' }}>Khidmat ki wajah:</Text>
               <Text style={{ marginTop: 4, fontSize: 12, color: '#1E3A8A', lineHeight: 18 }}>{reasoning}</Text>
             </View>
 
