@@ -86,8 +86,14 @@ export default function AuthScreen() {
   const signup = useAuthStore((s) => s.signup);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
-  // Progressive Onboarding Wizard: 'form' -> 'verify_phone' -> 'provider_setup'
-  const [authStep, setAuthStep] = useState<'form' | 'verify_phone' | 'provider_setup'>('form');
+  // Progressive Onboarding Wizard: 'form' -> 'verify_phone' -> 'provider_setup' | 'forgot_password_request' -> 'forgot_password_verify'
+  type AuthStep =
+    | 'form'
+    | 'verify_phone'
+    | 'provider_setup'
+    | 'forgot_password_request'
+    | 'forgot_password_verify';
+  const [authStep, setAuthStep] = useState<AuthStep>('form');
   const [mode, setMode] = useState<'login' | 'signup'>('signup');
   const [role, setRole] = useState<UserRole>('customer');
 
@@ -102,6 +108,10 @@ export default function AuthScreen() {
     longitude: 73.0538,
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
@@ -412,6 +422,120 @@ export default function AuthScreen() {
       toast.error('Registration Failed', err.message || 'Could not complete registration.');
     }
   };
+
+  // Step: Request Reset Password OTP
+  const handleRequestResetOtp = async () => {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (!cleanPhone || cleanPhone.length < 9) {
+      setFieldErrors({ phone: 'Please enter your registered phone number' });
+      return;
+    }
+
+    setIsLoading(true);
+    const formattedPhone = cleanPhone.startsWith('92')
+      ? `+${cleanPhone}`
+      : cleanPhone.startsWith('0')
+      ? `+92${cleanPhone.slice(1)}`
+      : `+92${cleanPhone}`;
+
+    try {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/api/auth/phone/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formattedPhone }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Code send nahi hua');
+      setAuthStep('forgot_password_verify');
+      setOtpCode('');
+      toast.success('Code bhej diya', 'SMS mein aya code aur naya PIN darj karein.');
+    } catch (err: any) {
+      toast.error('Code nahi bheja', err.message || 'Dobara koshish karein.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Step: Verify OTP & Reset Password
+  const handleResetPasswordSubmit = async () => {
+    if (!otpCode || otpCode.length < 4) {
+      setFieldErrors({ otp: 'Please enter the 4-digit code (Code darj karein)' });
+      return;
+    }
+    if (!newPassword.trim() || newPassword.length < 4) {
+      setFieldErrors({ password: 'New PIN must be at least 4 digits' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setFieldErrors({ password: 'PIN confirmation does not match' });
+      return;
+    }
+
+    setIsLoading(true);
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const formattedPhone = cleanPhone.startsWith('92')
+      ? `+${cleanPhone}`
+      : cleanPhone.startsWith('0')
+      ? `+92${cleanPhone.slice(1)}`
+      : `+92${cleanPhone}`;
+
+    try {
+      const baseUrl = getApiBaseUrl();
+      // 1. Verify phone OTP
+      const verifyRes = await fetch(`${baseUrl}/api/auth/phone/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formattedPhone, code: otpCode }),
+      });
+      const verifyJson = await verifyRes.json();
+      if (!verifyRes.ok || !verifyJson.data?.phoneVerificationToken) {
+        throw new Error(verifyJson.message || 'Code ghalat hai');
+      }
+
+      // 2. Reset password on backend
+      const resetRes = await fetch(`${baseUrl}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: formattedPhone,
+          newPassword,
+          phoneVerificationToken: verifyJson.data.phoneVerificationToken,
+        }),
+      });
+      const resetJson = await resetRes.json();
+      if (!resetRes.ok) {
+        throw new Error(resetJson.message || 'Password update failed');
+      }
+
+      // 3. Update auth store with user & token
+      if (resetJson.data?.user && resetJson.data?.token) {
+        const backendUser = resetJson.data.user;
+        useAuthStore.setState({
+          user: {
+            id: backendUser.id,
+            name: backendUser.name,
+            phone: backendUser.phone,
+            email: backendUser.email || '',
+            role: backendUser.role,
+            sector: backendUser.sector,
+          },
+          token: resetJson.data.token,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        });
+      }
+
+      toast.success('PIN Reset Kamyab! 🎉', 'Naya PIN set ho gaya hai.');
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      toast.error('PIN Reset Nahi Hua', err.message || 'Dobara koshish karein.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   // Quick Demo Login (strictly for development testing)
   const handleQuickDemoLogin = async (demoRole: UserRole) => {
@@ -824,9 +948,26 @@ export default function AuthScreen() {
 
               {/* Field 5: Password / PIN (Required) */}
               <View className="mb-5">
-                <Text className="mb-1.5 text-xs font-bold text-gray-800">
-                  Password / PIN <Text className="text-red-500">*</Text>
-                </Text>
+                <View className="flex-row items-center justify-between mb-1.5">
+                  <Text className="text-xs font-bold text-gray-800">
+                    Password / PIN <Text className="text-red-500">*</Text>
+                  </Text>
+                  {mode === 'login' && (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Forgot password or PIN"
+                      onPress={() => {
+                        setAuthStep('forgot_password_request');
+                        setOtpCode('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                        setFieldErrors({});
+                      }}
+                    >
+                      <Text className="text-xs font-bold text-primary">Forgot PIN?</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <View
                   className="flex-row items-center rounded-xl border px-3.5 py-3"
                   style={{
@@ -1325,6 +1466,298 @@ export default function AuthScreen() {
               <Text className="text-white font-extrabold text-base">
                 Complete Setup & Go to Job Queue →
               </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        )}
+
+        {/* ── STEP: FORGOT PASSWORD - REQUEST OTP ── */}
+        {authStep === 'forgot_password_request' && (
+          <ScrollView className="flex-1 px-5 py-5" keyboardShouldPersistTaps="handled">
+            <TouchableOpacity
+              onPress={() => setAuthStep('form')}
+              className="flex-row items-center gap-1 mb-4 self-start py-1"
+            >
+              <Ionicons name="arrow-back" size={18} color={colors.gray500} />
+              <Text className="text-xs font-bold text-gray-600">Back to sign in</Text>
+            </TouchableOpacity>
+
+            <View className="mb-6 items-center text-center">
+              <View className="h-16 w-16 items-center justify-center rounded-full bg-orange-100 mb-3">
+                <Ionicons name="key-outline" size={30} color={colors.primary} />
+              </View>
+              <Text className="text-2xl font-black text-gray-900">Forgot Your PIN?</Text>
+              <Text className="text-sm text-gray-600 mt-1 text-center font-medium">
+                Enter your registered mobile number. We will send a 4-digit code to reset your PIN.
+              </Text>
+            </View>
+
+            {/* Phone Number Field */}
+            <View className="mb-5">
+              <Text className="mb-1.5 text-xs font-bold text-gray-800">
+                Mobile Number <Text className="text-red-500">*</Text>
+              </Text>
+              <View
+                className="flex-row items-center rounded-xl border px-3.5 py-3"
+                style={{
+                  borderColor: fieldErrors.phone ? '#F87171' : '#E5E7EB',
+                  backgroundColor: fieldErrors.phone ? 'rgba(254,242,242,0.6)' : '#F9FAFB',
+                }}
+              >
+                <Text className="text-sm font-bold text-gray-700 mr-2">🇵🇰 +92</Text>
+                <TextInput
+                  accessibilityLabel="Registered phone number for password reset"
+                  className="flex-1 text-sm text-gray-900 font-medium"
+                  placeholder="300 1234567"
+                  placeholderTextColor={colors.gray400}
+                  keyboardType="phone-pad"
+                  value={phone.replace(/^\+?92\s?/, '')}
+                  onChangeText={(t) => {
+                    setPhone(t);
+                    if (fieldErrors.phone) setFieldErrors((p) => ({ ...p, phone: undefined }));
+                  }}
+                  autoFocus
+                />
+              </View>
+              {fieldErrors.phone && (
+                <Text className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.phone}</Text>
+              )}
+            </View>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Send reset verification code"
+              disabled={isLoading}
+              onPress={handleRequestResetOtp}
+              activeOpacity={0.88}
+              className="items-center justify-center rounded-2xl bg-primary py-4 px-6 shadow-sm active:bg-primaryActive"
+              style={{ opacity: isLoading ? 0.7 : 1 }}
+            >
+              {isLoading ? (
+                <View className="flex-row items-center gap-2">
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text className="text-white font-bold text-base">Sending Code...</Text>
+                </View>
+              ) : (
+                <Text className="text-white font-extrabold text-base">Send Verification Code</Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        )}
+
+        {/* ── STEP: FORGOT PASSWORD - VERIFY OTP & SET NEW PIN ── */}
+        {authStep === 'forgot_password_verify' && (
+          <ScrollView className="flex-1 px-5 py-5" keyboardShouldPersistTaps="handled">
+            <TouchableOpacity
+              onPress={() => setAuthStep('forgot_password_request')}
+              className="flex-row items-center gap-1 mb-4 self-start py-1"
+            >
+              <Ionicons name="arrow-back" size={18} color={colors.gray500} />
+              <Text className="text-xs font-bold text-gray-600">Change number</Text>
+            </TouchableOpacity>
+
+            <View className="mb-6 items-center text-center">
+              <View className="h-16 w-16 items-center justify-center rounded-full bg-orange-100 mb-3">
+                <Ionicons name="shield-checkmark-outline" size={30} color={colors.primary} />
+              </View>
+              <Text className="text-2xl font-black text-gray-900">Set New PIN</Text>
+              <Text className="text-sm text-gray-600 mt-1 text-center font-medium">
+                Enter the 4-digit code sent to:
+              </Text>
+              <Text className="text-base font-bold text-primary mt-0.5">
+                {phone.startsWith('+92') ? phone : `+92 ${phone}`}
+              </Text>
+            </View>
+
+            {/* 4-digit code box */}
+            <View className="mb-5">
+              <Text className="text-xs font-bold text-gray-700 text-center mb-3">
+                Enter 4-Digit Code (SMS Code Likhein)
+              </Text>
+
+              <View className="relative mx-auto items-center justify-center">
+                <View className="flex-row items-center justify-center gap-3">
+                  {[0, 1, 2, 3].map((index) => {
+                    const digit = otpCode[index] || '';
+                    const isCurrent = (index === otpCode.length || (index === 3 && otpCode.length === 4)) && isOtpFocused;
+                    const isFilled = Boolean(digit);
+
+                    let boxBorderColor = '#E5E7EB';
+                    let boxBg = '#F9FAFB';
+                    if (fieldErrors.otp) {
+                      boxBorderColor = '#F87171';
+                      boxBg = 'rgba(254,242,242,0.8)';
+                    } else if (isCurrent) {
+                      boxBorderColor = colors.primary;
+                      boxBg = '#FFF7ED';
+                    } else if (isFilled) {
+                      boxBorderColor = colors.primary;
+                      boxBg = '#FFFFFF';
+                    }
+
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        activeOpacity={0.85}
+                        onPress={() => otpInputRef.current?.focus()}
+                        style={{
+                          width: 56,
+                          height: 64,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 16,
+                          borderWidth: 2,
+                          borderColor: boxBorderColor,
+                          backgroundColor: boxBg,
+                        }}
+                      >
+                        <Text className="text-3xl font-black text-gray-900">{digit}</Text>
+                        {isCurrent && !digit && (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              bottom: 12,
+                              height: 4,
+                              width: 20,
+                              borderRadius: 999,
+                              backgroundColor: colors.primary,
+                            }}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <TextInput
+                  ref={otpInputRef}
+                  value={otpCode}
+                  onChangeText={(value) => {
+                    const cleanValue = value.replace(/\D/g, '').slice(0, 4);
+                    setOtpCode(cleanValue);
+                    if (fieldErrors.otp) setFieldErrors((current) => ({ ...current, otp: undefined }));
+                  }}
+                  onFocus={() => setIsOtpFocused(true)}
+                  onBlur={() => setIsOtpFocused(false)}
+                  keyboardType="number-pad"
+                  textContentType="oneTimeCode"
+                  autoComplete="sms-otp"
+                  maxLength={4}
+                  caretHidden
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                  }}
+                />
+              </View>
+              {fieldErrors.otp && (
+                <Text className="mt-2 text-xs font-semibold text-red-500 text-center">{fieldErrors.otp}</Text>
+              )}
+            </View>
+
+            {/* Field: New PIN */}
+            <View className="mb-4">
+              <Text className="mb-1.5 text-xs font-bold text-gray-800">
+                New PIN / Password <Text className="text-red-500">*</Text>
+              </Text>
+              <View
+                className="flex-row items-center rounded-xl border px-3.5 py-3"
+                style={{
+                  borderColor: fieldErrors.password ? '#F87171' : '#E5E7EB',
+                  backgroundColor: fieldErrors.password ? 'rgba(254,242,242,0.6)' : '#F9FAFB',
+                }}
+              >
+                <Ionicons name="lock-closed-outline" size={18} color={colors.gray400} />
+                <TextInput
+                  accessibilityLabel="New PIN or password input"
+                  className="ml-2.5 flex-1 text-sm text-gray-900 font-medium"
+                  placeholder="Enter new 4-digit PIN"
+                  placeholderTextColor={colors.gray400}
+                  secureTextEntry={!showNewPassword}
+                  value={newPassword}
+                  onChangeText={(t) => {
+                    setNewPassword(t);
+                    if (fieldErrors.password) setFieldErrors((p) => ({ ...p, password: undefined }));
+                  }}
+                />
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={showNewPassword ? 'Hide new PIN' : 'Show new PIN'}
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                  className="p-1"
+                >
+                  <Ionicons
+                    name={showNewPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={colors.gray500}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Field: Confirm New PIN */}
+            <View className="mb-6">
+              <Text className="mb-1.5 text-xs font-bold text-gray-800">
+                Confirm New PIN <Text className="text-red-500">*</Text>
+              </Text>
+              <View
+                className="flex-row items-center rounded-xl border px-3.5 py-3"
+                style={{
+                  borderColor: fieldErrors.password ? '#F87171' : '#E5E7EB',
+                  backgroundColor: fieldErrors.password ? 'rgba(254,242,242,0.6)' : '#F9FAFB',
+                }}
+              >
+                <Ionicons name="lock-closed-outline" size={18} color={colors.gray400} />
+                <TextInput
+                  accessibilityLabel="Confirm new PIN or password input"
+                  className="ml-2.5 flex-1 text-sm text-gray-900 font-medium"
+                  placeholder="Re-enter new 4-digit PIN"
+                  placeholderTextColor={colors.gray400}
+                  secureTextEntry={!showConfirmPassword}
+                  value={confirmPassword}
+                  onChangeText={(t) => {
+                    setConfirmPassword(t);
+                    if (fieldErrors.password) setFieldErrors((p) => ({ ...p, password: undefined }));
+                  }}
+                />
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={showConfirmPassword ? 'Hide confirm PIN' : 'Show confirm PIN'}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="p-1"
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={colors.gray500}
+                  />
+                </TouchableOpacity>
+              </View>
+              {fieldErrors.password && (
+                <Text className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.password}</Text>
+              )}
+            </View>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Reset PIN and sign in"
+              disabled={isLoading}
+              onPress={handleResetPasswordSubmit}
+              activeOpacity={0.88}
+              className="items-center justify-center rounded-2xl bg-primary py-4 px-6 shadow-sm active:bg-primaryActive mb-8"
+              style={{ opacity: isLoading ? 0.7 : 1 }}
+            >
+              {isLoading ? (
+                <View className="flex-row items-center gap-2">
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text className="text-white font-bold text-base">Updating PIN...</Text>
+                </View>
+              ) : (
+                <Text className="text-white font-extrabold text-base">Reset PIN & Sign In →</Text>
+              )}
             </TouchableOpacity>
           </ScrollView>
         )}

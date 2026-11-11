@@ -4,12 +4,11 @@ import {
   Text,
   TouchableOpacity,
   TextInput,
-  Alert,
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/lib/theme/colors';
-import { useDuesStore, CustomerDue } from '@/lib/stores/useDuesStore';
+import { useDuesStore } from '@/lib/stores/useDuesStore';
 import { toast } from '@/lib/stores/useToastStore';
 
 export function DuesLedgerCard() {
@@ -102,7 +101,7 @@ export function DuesLedgerCard() {
               No customer dues recorded
             </Text>
             <Text className="text-[10px] text-gray-400">
-              Tap 'Record Due' to record customer balances.
+              Tap &apos;Record Due&apos; to record customer balances.
             </Text>
           </View>
         ) : (

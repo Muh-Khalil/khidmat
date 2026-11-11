@@ -46,9 +46,15 @@ function optionalList(name: string): string[] | undefined {
 }
 
 export const env = {
+  NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: requiredPort('PORT', 5000),
   GEMINI_API_KEY: required('GEMINI_API_KEY'),
   GEMINI_MODEL_NAME: required('GEMINI_MODEL_NAME', 'gemini-2.0-flash'),
   CORS_ORIGINS: optionalList('CORS_ORIGINS'),
   DATABASE_URL: process.env.DATABASE_URL,
+  AUTH_SECRET: required('AUTH_SECRET', isTest ? 'test-auth-secret-at-least-32-characters' : undefined),
+  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
+  TWILIO_VERIFY_SERVICE_SID: process.env.TWILIO_VERIFY_SERVICE_SID,
+  GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY,
 };

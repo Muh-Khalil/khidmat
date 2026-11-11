@@ -1,0 +1,26 @@
+# Dependencies
+**/node_modules/
+**/__pycache__
+**/.env
+
+# IDEs
+.vscode/
+.idea/
+
+# Documentation
+FYP_Proposal_Agentic_AI.md
+implementation_plan.md
+implementation_plan.md.resolved
+new_implementation.md
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Test case of the server
+**/test-chat.ps1
+**/test-client.js
+
+**/docs/

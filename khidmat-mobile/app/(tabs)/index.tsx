@@ -358,7 +358,7 @@ export default function ChatScreen() {
           return null;
       }
     },
-    [handleBook, isProcessing],
+    [defaultLocation, handleBook, isProcessing],
   );
 
   const user = useAuthStore((s) => s.user);
@@ -462,7 +462,15 @@ export default function ChatScreen() {
                   />
                 ))}
               </View>
-              <Pressable onPress={() => router.push('/providers/external' as any)} className="mt-5 flex-row items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 active:bg-gray-50"><Ionicons name="search" size={18} color={colors.primary} /><Text className="ml-2 text-sm font-bold text-gray-700">Khidmat se bahar providers dhoondein</Text></Pressable>
+              <Pressable
+                onPress={() => router.push('/providers/external' as any)}
+                className="mt-5 flex-row items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 active:bg-gray-50"
+              >
+                <Ionicons name="search" size={18} color={colors.primary} />
+                <Text className="ml-2 flex-shrink text-center text-sm font-bold text-gray-700">
+                  Khidmat se bahar providers dhoondein
+                </Text>
+              </Pressable>
             </View>
           ) : (
             <>

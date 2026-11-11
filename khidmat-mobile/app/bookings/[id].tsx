@@ -15,15 +15,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { StatusBadge } from '@/components/StatusBadge';
-import { ChatBubble } from '@/components/ChatBubble';
-import { ExtractedFieldsRow } from '@/components/ExtractedFieldsRow';
 import { Button } from '@/components/Button';
 import { useBookingsStore } from '@/lib/stores/useBookingsStore';
 import type { BookingStatus } from '@/lib/stores/useBookingsStore';
 import { providers } from '@/lib/mock/providers';
-import type { AgentEvent } from '@/lib/agent/types';
 import { categoryEmoji, categoryServiceLabel } from '@/lib/categories';
-import { formatLocationLabel } from '@/lib/util/location';
 import { toast } from '@/lib/stores/useToastStore';
 import { colors } from '@/lib/theme/colors';
 import { authenticatedFetch } from '@/lib/services/authenticatedFetch';
@@ -71,7 +67,6 @@ export default function BookingDetailScreen() {
   const booking = useMemo(() => bookings.find((b) => b.id === id), [bookings, id]);
   const cancel = useBookingsStore((s) => s.cancel);
 
-  const [showThread, setShowThread] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
 
   // Review Modal State
@@ -88,18 +83,18 @@ export default function BookingDetailScreen() {
   const [complaintDetails, setComplaintDetails] = useState('');
   const [submittingComplaint, setSubmittingComplaint] = useState(false);
 
-  const provider = providers.find((p) => p.id === booking?.providerId) || {
-    id: booking?.providerId || 'p_unknown',
-    name: booking?.providerName || 'Service Karigar',
-    category: booking?.category || 'ac',
-    sector: booking?.sector || 'Islamabad',
-    rating: 4.9,
-    reviewCount: 45,
-    yearsExperience: 5,
-    priceRange: 'PKR 1500-2500',
-    phone: '+92 300 1234567',
-    badge: 'Verified Pro',
-  };
+  const provider = useMemo(() => providers.find((p) => p.id === booking?.providerId) || ({
+      id: booking?.providerId || 'p_unknown',
+      name: booking?.providerName || 'Service Karigar',
+      category: booking?.category || 'ac',
+      sector: booking?.sector || 'Islamabad',
+      rating: 4.9,
+      reviewCount: 45,
+      yearsExperience: 5,
+      priceRange: 'PKR 1500-2500',
+      phone: '+92 300 1234567',
+      badge: 'Verified Pro',
+    }), [booking]);
 
   // Check if already favorited or reviewed
   useEffect(() => {

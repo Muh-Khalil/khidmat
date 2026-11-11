@@ -236,7 +236,7 @@ export function ProviderCard({
         }}
         accessibilityLabel={`Book appointment with ${provider.name}`}
       >
-        <Ionicons name="calendar-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+        
         <Text style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF' }}>
           Request bhejein • {dayLabel} {suggestedSlot}
         </Text>

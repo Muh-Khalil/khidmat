@@ -150,7 +150,7 @@ export function InputBar({
           startTimer();
 
           await startVoiceRecording();
-        } catch (err: any) {
+        } catch (err) {
           console.error('[InputBar] Failed to start voice recording:', err);
           stopTimer();
           isRecordingRef.current = false;
@@ -232,7 +232,7 @@ export function InputBar({
           } else {
             toast.warning('No Speech Detected', 'Awaaz samajh nahi aayi. Baraye meherbani dobara bolein.');
           }
-        } catch (err: any) {
+        } catch {
           setIsTranscribing(false);
           setRecordSeconds(0);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -423,8 +423,8 @@ export function InputBar({
 
       {/* Helper Micro-Hint for Novice / Low Digital Literacy Users */}
       {!isRecording && !isTranscribing && !hasText && (
-        <View style={{ marginTop: 4, alignItems: 'center' }}>
-          <Text style={{ fontSize: 11, fontWeight: '600', color: '#9CA3AF' }}>
+        <View style={{ marginTop: 4, alignItems: 'center', paddingHorizontal: 8 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: '#9CA3AF', textAlign: 'center' }}>
             🎙️ Mic ko <Text style={{ color: colors.primary, fontWeight: '700' }}>daba kar rakhein</Text> aur bolein (Hold to speak)
           </Text>
         </View>

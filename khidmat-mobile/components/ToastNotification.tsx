@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   Animated,
   StyleSheet,
@@ -67,6 +67,28 @@ export const ToastNotification: React.FC = () => {
   const opacity = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const dismissToast = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: -20,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateX, {
+        toValue: 30,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      hideToast();
+    });
+  }, [hideToast, opacity, translateX, translateY]);
+
   useEffect(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -111,29 +133,7 @@ export const ToastNotification: React.FC = () => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [currentToast?.id]);
-
-  const dismissToast = () => {
-    Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: -20,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateX, {
-        toValue: 30,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      hideToast();
-    });
-  };
+  }, [currentToast, dismissToast, opacity, translateX, translateY]);
 
   if (!currentToast) return null;
 

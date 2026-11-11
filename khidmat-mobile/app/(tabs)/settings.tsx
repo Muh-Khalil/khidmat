@@ -8,6 +8,7 @@ import {
   Alert,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -17,11 +18,12 @@ import * as Haptics from 'expo-haptics';
 import { useSettingsStore } from '@/lib/stores/useSettingsStore';
 import { useBookingsStore } from '@/lib/stores/useBookingsStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
-import { Button } from '@/components/Button';
 import { SECTORS as SECTOR_OPTIONS, DEFAULT_SECTOR } from '@/lib/mock/providers';
 import { toast } from '@/lib/stores/useToastStore';
 import { colors } from '@/lib/theme/colors';
 import { getCurrentUserLocation } from '@/lib/services/locationService';
+import { authenticatedFetch } from '@/lib/services/authenticatedFetch';
+import { getApiBaseUrl } from '@/lib/util/apiConfig';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -38,6 +40,14 @@ export default function SettingsScreen() {
   const [locationInput, setLocationInput] = useState(defaultLocation);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+
+  // Change PIN State
+  const [isChangePinModalOpen, setIsChangePinModalOpen] = useState(false);
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [showCurrentPin, setShowCurrentPin] = useState(false);
+  const [showNewPin, setShowNewPin] = useState(false);
+  const [isUpdatingPin, setIsUpdatingPin] = useState(false);
 
   const filteredSectors = useMemo(() => {
     if (!locationInput) return SECTOR_OPTIONS;
@@ -109,6 +119,39 @@ export default function SettingsScreen() {
     setLocationInput(detectedName);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     toast.success('Location Updated', `Default location set to ${detectedName}`);
+  };
+
+  const handleChangePinSubmit = async () => {
+    if (!currentPin.trim() || currentPin.length < 4) {
+      toast.warning('Invalid PIN', 'Please enter your current 4-digit PIN.');
+      return;
+    }
+    if (!newPin.trim() || newPin.length < 4) {
+      toast.warning('Invalid PIN', 'New PIN must be at least 4 digits.');
+      return;
+    }
+
+    setIsUpdatingPin(true);
+    try {
+      const baseUrl = getApiBaseUrl();
+      const res = await authenticatedFetch(`${baseUrl}/api/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: currentPin, newPassword: newPin }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Could not update PIN');
+      }
+      toast.success('PIN Updated! 🎉', 'Your security PIN has been changed successfully.');
+      setIsChangePinModalOpen(false);
+      setCurrentPin('');
+      setNewPin('');
+    } catch (err: any) {
+      toast.error('Update Failed', err.message || 'Please check your current PIN.');
+    } finally {
+      setIsUpdatingPin(false);
+    }
   };
 
   const handleClearBookings = () => {
@@ -230,13 +273,27 @@ export default function SettingsScreen() {
                 </Text>
               </View>
 
-              <TouchableOpacity
-                onPress={handleLogout}
-                className="flex-row items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 border border-red-200 active:bg-red-100"
-              >
-                <Ionicons name="log-out-outline" size={14} color="#DC2626" />
-                <Text className="text-xs font-bold text-red-600">Sign Out</Text>
-              </TouchableOpacity>
+              <View className="flex-row items-center gap-2">
+                <TouchableOpacity
+                  onPress={() => {
+                    setCurrentPin('');
+                    setNewPin('');
+                    setIsChangePinModalOpen(true);
+                  }}
+                  className="flex-row items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1.5 border border-gray-200 active:bg-gray-200"
+                >
+                  <Ionicons name="key-outline" size={13} color="#374151" />
+                  <Text className="text-xs font-bold text-gray-800">Change PIN</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleLogout}
+                  className="flex-row items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 border border-red-200 active:bg-red-100"
+                >
+                  <Ionicons name="log-out-outline" size={14} color="#DC2626" />
+                  <Text className="text-xs font-bold text-red-600">Sign Out</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         ) : (
@@ -411,7 +468,114 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Change PIN Modal */}
+      <Modal
+        visible={isChangePinModalOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsChangePinModalOpen(false)}
+      >
+        <SafeAreaView className="flex-1 bg-white" edges={['top', 'bottom']}>
+          <View className="flex-row items-center justify-between border-b border-gray-100 px-5 py-3">
+            <View className="flex-row items-center gap-2">
+              <View className="h-8 w-8 items-center justify-center rounded-full bg-orange-100">
+                <Ionicons name="key-outline" size={18} color={colors.primary} />
+              </View>
+              <Text className="text-base font-bold text-gray-900">Change PIN / Password</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setIsChangePinModalOpen(false)}
+              className="h-8 w-8 items-center justify-center rounded-full bg-gray-100"
+            >
+              <Ionicons name="close" size={18} color={colors.gray500} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView className="flex-1 px-5 py-4" keyboardShouldPersistTaps="handled">
+            <Text className="text-xs text-gray-500 mb-5 leading-5 font-medium">
+              Update your 4-digit security PIN used to sign into your Khidmat account.
+            </Text>
+
+            {/* Current PIN */}
+            <View className="mb-4">
+              <Text className="text-xs font-bold text-gray-700 mb-1.5">
+                Current PIN <Text className="text-red-500">*</Text>
+              </Text>
+              <View className="flex-row items-center rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-3">
+                <Ionicons name="lock-closed-outline" size={18} color={colors.gray400} />
+                <TextInput
+                  className="ml-2.5 flex-1 text-sm text-gray-900 font-medium"
+                  placeholder="Enter current PIN"
+                  placeholderTextColor={colors.gray400}
+                  secureTextEntry={!showCurrentPin}
+                  value={currentPin}
+                  onChangeText={setCurrentPin}
+                />
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={showCurrentPin ? 'Hide current PIN' : 'Show current PIN'}
+                  onPress={() => setShowCurrentPin(!showCurrentPin)}
+                  className="p-1"
+                >
+                  <Ionicons
+                    name={showCurrentPin ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={colors.gray500}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* New PIN */}
+            <View className="mb-6">
+              <Text className="text-xs font-bold text-gray-700 mb-1.5">
+                New PIN <Text className="text-red-500">*</Text>
+              </Text>
+              <View className="flex-row items-center rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-3">
+                <Ionicons name="lock-closed-outline" size={18} color={colors.gray400} />
+                <TextInput
+                  className="ml-2.5 flex-1 text-sm text-gray-900 font-medium"
+                  placeholder="Enter new 4-digit PIN"
+                  placeholderTextColor={colors.gray400}
+                  secureTextEntry={!showNewPin}
+                  value={newPin}
+                  onChangeText={setNewPin}
+                />
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={showNewPin ? 'Hide new PIN' : 'Show new PIN'}
+                  onPress={() => setShowNewPin(!showNewPin)}
+                  className="p-1"
+                >
+                  <Ionicons
+                    name={showNewPin ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={colors.gray500}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              disabled={isUpdatingPin}
+              onPress={handleChangePinSubmit}
+              activeOpacity={0.88}
+              className="items-center justify-center rounded-2xl bg-primary py-4 px-6 shadow-sm active:bg-primaryActive"
+              style={{ opacity: isUpdatingPin ? 0.7 : 1 }}
+            >
+              {isUpdatingPin ? (
+                <View className="flex-row items-center gap-2">
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text className="text-white font-bold text-base">Updating PIN...</Text>
+                </View>
+              ) : (
+                <Text className="text-white font-extrabold text-base">Update Security PIN</Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
-
